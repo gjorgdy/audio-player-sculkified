@@ -6,7 +6,7 @@ import de.maxhenkel.admiral.annotations.Command;
 import de.maxhenkel.admiral.annotations.Name;
 import de.maxhenkel.admiral.annotations.RequiresPermission;
 import de.maxhenkel.audioplayer.AudioManager;
-import de.maxhenkel.audioplayer.AudioPlayer;
+import de.maxhenkel.audioplayer.AudioPlayerMod;
 import de.maxhenkel.audioplayer.Filebin;
 import de.maxhenkel.audioplayer.webserver.UrlUtils;
 import de.maxhenkel.audioplayer.webserver.WebServer;
@@ -104,7 +104,7 @@ public class UploadCommands {
                 Filebin.downloadSound(context.getSource().getServer(), sound);
                 context.getSource().sendSuccess(() -> sendUUIDMessage(sound, Component.literal("Successfully downloaded sound.")), false);
             } catch (Exception e) {
-                AudioPlayer.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.getMessage());
+                AudioPlayerMod.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.getMessage());
                 context.getSource().sendFailure(Component.literal("Failed to download sound: %s".formatted(e.getMessage())));
             }
         }).start();
@@ -138,13 +138,13 @@ public class UploadCommands {
                 AudioManager.saveSound(context.getSource().getServer(), sound, url);
                 context.getSource().sendSuccess(() -> sendUUIDMessage(sound, Component.literal("Successfully downloaded sound.")), false);
             } catch (UnknownHostException e) {
-                AudioPlayer.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.toString());
+                AudioPlayerMod.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.toString());
                 context.getSource().sendFailure(Component.literal("Failed to download sound: Unknown host"));
             } catch (UnsupportedAudioFileException e) {
-                AudioPlayer.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.toString());
+                AudioPlayerMod.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.toString());
                 context.getSource().sendFailure(Component.literal("Failed to download sound: Invalid file format"));
             } catch (Exception e) {
-                AudioPlayer.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.toString());
+                AudioPlayerMod.LOGGER.warn("{} failed to download a sound: {}", context.getSource().getTextName(), e.toString());
                 context.getSource().sendFailure(Component.literal("Failed to download sound: %s".formatted(e.getMessage())));
             }
         }).start();
@@ -238,7 +238,7 @@ public class UploadCommands {
             } catch (NoSuchFileException e) {
                 context.getSource().sendFailure(Component.literal("Could not find file ").append(Component.literal(fileName).withStyle(ChatFormatting.GRAY)).append("."));
             } catch (Exception e) {
-                AudioPlayer.LOGGER.warn("{} failed to copy a sound: {}", context.getSource().getTextName(), e.getMessage());
+                AudioPlayerMod.LOGGER.warn("{} failed to copy a sound: {}", context.getSource().getTextName(), e.getMessage());
                 context.getSource().sendFailure(Component.literal("Failed to copy sound: %s".formatted(e.getMessage())));
             }
         }).start();

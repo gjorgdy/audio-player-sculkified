@@ -17,7 +17,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.*;
+import net.minecraft.world.item.Instrument;
+import net.minecraft.world.item.Instruments;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.JukeboxPlayable;
 
 import java.util.Optional;
 

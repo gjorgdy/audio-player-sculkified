@@ -20,6 +20,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 public class AudioManager {
@@ -27,7 +28,7 @@ public class AudioManager {
     public static LevelResource AUDIO_DATA = new LevelResource("audio_player_data");
 
     public static short[] getSound(MinecraftServer server, UUID id) throws Exception {
-        return AudioPlayer.AUDIO_CACHE.get(id, () -> AudioConverter.convert(getExistingSoundFile(server, id)));
+        return AudioPlayerMod.AUDIO_CACHE.get(id, () -> AudioConverter.convert(getExistingSoundFile(server, id)));
     }
 
     public static Path getSoundFile(MinecraftServer server, UUID id, String extension) {
@@ -55,7 +56,7 @@ public class AudioManager {
     }
 
     public static void saveSound(MinecraftServer server, UUID id, String url) throws UnsupportedAudioFileException, IOException {
-        byte[] data = download(new URL(url), AudioPlayer.SERVER_CONFIG.maxUploadSize.get());
+        byte[] data = download(new URL(url), AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get());
         saveSound(server, id, FileNameManager.getFileNameFromUrl(url), data);
     }
 
@@ -82,8 +83,8 @@ public class AudioManager {
         }
 
         long size = Files.size(file);
-        if (size > AudioPlayer.SERVER_CONFIG.maxUploadSize.get()) {
-            throw new IOException("Maximum file size exceeded (%sMB>%sMB)".formatted(Math.round((float) size / 1_000_000F), Math.round(AudioPlayer.SERVER_CONFIG.maxUploadSize.get().floatValue() / 1_000_000F)));
+        if (size > AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get()) {
+            throw new IOException("Maximum file size exceeded (%sMB>%sMB)".formatted(Math.round((float) size / 1_000_000F), Math.round(AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get().floatValue() / 1_000_000F)));
         }
 
         AudioConverter.AudioType audioType = AudioConverter.getAudioType(file);
@@ -104,12 +105,12 @@ public class AudioManager {
             throw new UnsupportedAudioFileException("Unsupported audio format");
         }
         if (audioType.equals(AudioConverter.AudioType.MP3)) {
-            if (!AudioPlayer.SERVER_CONFIG.allowMp3Upload.get()) {
+            if (!AudioPlayerMod.SERVER_CONFIG.allowMp3Upload.get()) {
                 throw new UnsupportedAudioFileException("Uploading mp3 files is not allowed on this server");
             }
         }
         if (audioType.equals(AudioConverter.AudioType.WAV)) {
-            if (!AudioPlayer.SERVER_CONFIG.allowWavUpload.get()) {
+            if (!AudioPlayerMod.SERVER_CONFIG.allowWavUpload.get()) {
                 throw new UnsupportedAudioFileException("Uploading wav files is not allowed on this server");
             }
         }
@@ -135,6 +136,28 @@ public class AudioManager {
         }
         bis.close();
         return bos.toByteArray();
+    }
+
+
+    @Nullable
+    public static UUID playMultiple(ServerLevel level, List<BlockPos> positions, PlayerType type, CustomSound sound, @Nullable Player player) {
+        float range = sound.getRange(type);
+
+        VoicechatServerApi api = Plugin.voicechatServerApi;
+        if (api == null) {
+            return null;
+        }
+
+        return PlayerManager.instance().playMultipleLocational(
+                api,
+                level,
+                positions,
+                sound.getSoundId(),
+                (player instanceof ServerPlayer p) ? p : null,
+                range,
+                type.getCategory(),
+                type.getMaxDuration().get()
+        );
     }
 
     @Nullable
@@ -164,7 +187,7 @@ public class AudioManager {
                     type.getCategory(),
                     type.getMaxDuration().get()
             );
-        } else if (sound.isStaticSound() && AudioPlayer.SERVER_CONFIG.allowStaticAudio.get()) { //TODO Move option
+        } else if (sound.isStaticSound() && AudioPlayerMod.SERVER_CONFIG.allowStaticAudio.get()) { //TODO Move option
             channelID = PlayerManager.instance().playStatic(
                     api,
                     level,

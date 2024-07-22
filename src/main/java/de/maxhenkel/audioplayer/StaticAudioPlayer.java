@@ -63,7 +63,7 @@ public class StaticAudioPlayer implements de.maxhenkel.voicechat.api.audiochanne
                 if (p != null) {
                     p.displayClientMessage(Component.literal("Audio is too long to play").withStyle(ChatFormatting.DARK_RED), true);
                 } else {
-                    AudioPlayer.LOGGER.error("Audio {} was too long to play", sound);
+                    AudioPlayerMod.LOGGER.error("Audio {} was too long to play", sound);
                 }
                 return null;
             }
@@ -72,7 +72,7 @@ public class StaticAudioPlayer implements de.maxhenkel.voicechat.api.audiochanne
             instance.startPlaying();
             return instance;
         } catch (Exception e) {
-            AudioPlayer.LOGGER.error("Failed to play audio", e);
+            AudioPlayerMod.LOGGER.error("Failed to play audio", e);
             if (p != null) {
                 p.displayClientMessage(Component.literal("Failed to play audio: %s".formatted(e.getMessage())).withStyle(ChatFormatting.DARK_RED), true);
             }
@@ -118,7 +118,7 @@ public class StaticAudioPlayer implements de.maxhenkel.voicechat.api.audiochanne
     public void run() {
         int framePosition = 0;
 
-        ScheduledFuture<?> nearbyPlayersTask = AudioPlayer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+        ScheduledFuture<?> nearbyPlayersTask = AudioPlayerMod.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             List<ServerPlayer> players = api.getPlayersInRange(api.fromServerLevel(this.level), api.createPosition(pos.x, pos.y, pos.z), distance + 1F, serverPlayer -> {
                 VoicechatConnection connection = api.getConnectionOf(serverPlayer);
                 if (connection != null) {
@@ -153,7 +153,7 @@ public class StaticAudioPlayer implements de.maxhenkel.voicechat.api.audiochanne
 
         while ((frame = this.audio.get()) != null) {
             if (frame.length != FRAME_SIZE) {
-                AudioPlayer.LOGGER.error("Got invalid audio frame size {}!={}", frame.length, FRAME_SIZE);
+                AudioPlayerMod.LOGGER.error("Got invalid audio frame size {}!={}", frame.length, FRAME_SIZE);
                 break;
             }
             byte[] encoded = encoder.encode(frame);

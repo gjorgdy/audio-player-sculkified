@@ -94,7 +94,7 @@ public class AudioConverter {
             AudioInputStream source = new AudioInputStream(byteArrayInputStream, audioFormat, data.length / audioFormat.getFrameSize());
             return convert(source);
         } catch (Exception e) {
-            AudioPlayer.LOGGER.warn("Error converting mp3 file with native decoder");
+            AudioPlayerMod.LOGGER.warn("Error converting mp3 file with native decoder");
             return convert(AudioSystem.getAudioInputStream(file.toFile()));
         }
     }

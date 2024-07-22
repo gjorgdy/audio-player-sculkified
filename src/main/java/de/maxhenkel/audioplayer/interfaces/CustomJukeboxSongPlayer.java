@@ -5,6 +5,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.UUID;
+
 public interface CustomJukeboxSongPlayer {
 
     void audioplayer$onSave(ItemStack itemStack, CompoundTag compound, HolderLookup.Provider provider);
@@ -14,5 +16,7 @@ public interface CustomJukeboxSongPlayer {
     boolean audioplayer$customPlay(ServerLevel level, ItemStack item);
 
     boolean audioplayer$customStop();
+
+    UUID audioplayer$getPlayerUUID();
 
 }

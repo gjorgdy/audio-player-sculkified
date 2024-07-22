@@ -1,7 +1,7 @@
 package de.maxhenkel.audioplayer.webserver;
 
 import de.maxhenkel.audioplayer.AudioManager;
-import de.maxhenkel.audioplayer.AudioPlayer;
+import de.maxhenkel.audioplayer.AudioPlayerMod;
 import de.maxhenkel.audioplayer.command.UploadCommands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -55,7 +55,7 @@ public class WebServer implements AutoCloseable {
         staticFileCache = StaticFileCache.of("web");
 
         server = ServerBootstrap.bootstrap()
-                .setListenerPort(AudioPlayer.WEB_SERVER_CONFIG.port.get())
+                .setListenerPort(AudioPlayerMod.WEB_SERVER_CONFIG.port.get())
                 .setSocketConfig(socketConfig)
                 .setHandlerMapper(mapper)
                 .create();
@@ -97,8 +97,8 @@ public class WebServer implements AutoCloseable {
 
         @Override
         public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws HttpException, IOException {
-            String username = AudioPlayer.WEB_SERVER_CONFIG.authUsername.get();
-            String password = AudioPlayer.WEB_SERVER_CONFIG.authPassword.get();
+            String username = AudioPlayerMod.WEB_SERVER_CONFIG.authUsername.get();
+            String password = AudioPlayerMod.WEB_SERVER_CONFIG.authPassword.get();
             if (username.isBlank() || password.isBlank()) {
                 handler.handle(request, response, context);
                 return;
@@ -207,7 +207,7 @@ public class WebServer implements AutoCloseable {
             }
             HttpEntity entity = enclosingRequest.getEntity();
 
-            if (entity.getContentLength() > AudioPlayer.SERVER_CONFIG.maxUploadSize.get()) {
+            if (entity.getContentLength() > AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get()) {
                 response.setStatusCode(HttpStatus.SC_REQUEST_TOO_LONG);
                 return;
             }
@@ -231,7 +231,7 @@ public class WebServer implements AutoCloseable {
                 AudioManager.saveSound(minecraftServer, token, null, audioData); //TODO File name
                 player.sendSystemMessage(UploadCommands.sendUUIDMessage(token, Component.literal("Successfully uploaded sound.")));
             } catch (Exception e) {
-                AudioPlayer.LOGGER.warn("{} failed to upload a sound: {}", player.getName().getString(), e.getMessage());
+                AudioPlayerMod.LOGGER.warn("{} failed to upload a sound: {}", player.getName().getString(), e.getMessage());
                 player.sendSystemMessage(Component.literal("Failed to upload sound: %s".formatted(e.getMessage())));
             }
         }).start();

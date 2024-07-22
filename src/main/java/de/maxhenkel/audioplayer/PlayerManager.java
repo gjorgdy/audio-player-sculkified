@@ -1,19 +1,22 @@
 package de.maxhenkel.audioplayer;
 
 import de.maxhenkel.voicechat.api.Player;
+import de.maxhenkel.voicechat.api.Position;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
+import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,6 +38,34 @@ public class PlayerManager {
     }
 
     @Nullable
+    private AudioPlayer getAudioPlayer(UUID playerID) {
+        if (playerID == null) return null;
+        PlayerReference player = players.get(playerID);
+        if (player == null) return null;
+        return player.player().get();
+    }
+
+    @Nullable
+    public Collection<Position> getSpeakerPositions(UUID uuid) {
+        if (getAudioPlayer(uuid) instanceof MultiLocationalAudioPlayer map) {
+            return map.getChannelPositions();
+        }
+        return null;
+    }
+
+    public void stopSpeakerChannel(UUID playerID, Position position) {
+        if (getAudioPlayer(playerID) instanceof MultiLocationalAudioPlayer map) {
+            map.stopPlaying(position);
+        }
+    }
+
+    public void addSpeakerChannel(UUID playerID, LocationalAudioChannel channel) {
+        if (getAudioPlayer(playerID) instanceof MultiLocationalAudioPlayer map) {
+            map.addChannel(channel);
+        }
+    }
+
+    @Nullable
     public UUID playLocational(VoicechatServerApi api, ServerLevel level, Vec3 pos, UUID sound, @Nullable ServerPlayer p, float distance, @Nullable String category, int maxLengthSeconds) {
         return playLocational(api, level, pos, sound, p, distance, category, maxLengthSeconds, false);
     }
@@ -42,31 +73,15 @@ public class PlayerManager {
     @Nullable
     public UUID playLocational(VoicechatServerApi api, ServerLevel level, Vec3 pos, UUID sound, @Nullable ServerPlayer p, float distance, @Nullable String category, int maxLengthSeconds, boolean byCommand) {
         UUID channelID = UUID.randomUUID();
-        LocationalAudioChannel channel = api.createLocationalAudioChannel(channelID, api.fromServerLevel(level), api.createPosition(pos.x, pos.y, pos.z));
-        if (channel == null) {
-            return null;
-        }
-        if (category != null) {
-            channel.setCategory(category);
-        }
-        channel.setDistance(distance);
-        api.getPlayersInRange(api.fromServerLevel(level), channel.getLocation(), distance + 1F, serverPlayer -> {
-            VoicechatConnection connection = api.getConnectionOf(serverPlayer);
-            if (connection != null) {
-                return connection.isDisabled();
-            }
-            return true;
-        }).stream().map(Player::getPlayer).map(ServerPlayer.class::cast).forEach(player -> {
-            player.displayClientMessage(Component.literal("You need to enable voice chat to hear custom audio"), true);
-        });
+        LocationalAudioChannel channel = createLocationalAudioChannel(channelID, api, level, pos, category, distance);
 
         AtomicBoolean stopped = new AtomicBoolean();
-        AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player = new AtomicReference<>();
+        AtomicReference<AudioPlayer> player = new AtomicReference<>();
 
         players.put(channelID, new PlayerReference(() -> {
             synchronized (stopped) {
                 stopped.set(true);
-                de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = player.get();
+                AudioPlayer audioPlayer = player.get();
                 if (audioPlayer != null) {
                     audioPlayer.stopPlaying();
                 }
@@ -74,14 +89,12 @@ public class PlayerManager {
         }, player, sound, byCommand));
 
         executor.execute(() -> {
-            de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = playChannel(api, channel, level, sound, p, maxLengthSeconds);
+            AudioPlayer audioPlayer = playChannel(api, channel, level, sound, p, maxLengthSeconds);
             if (audioPlayer == null) {
                 players.remove(channelID);
                 return;
             }
-            audioPlayer.setOnStopped(() -> {
-                players.remove(channelID);
-            });
+            audioPlayer.setOnStopped(() -> players.remove(channelID));
             synchronized (stopped) {
                 if (!stopped.get()) {
                     player.set(audioPlayer);
@@ -91,6 +104,77 @@ public class PlayerManager {
             }
         });
         return channelID;
+    }
+
+    @Nullable
+    public UUID playMultipleLocational(VoicechatServerApi api, ServerLevel level, List<BlockPos> positions, UUID sound, @Nullable ServerPlayer p, float distance, @Nullable String category, int maxLengthSeconds) {
+        return playMultipleLocational(api, level, positions, sound, p, distance, category, maxLengthSeconds, false);
+    }
+
+    @Nullable
+    public UUID playMultipleLocational(VoicechatServerApi api, ServerLevel level, List<BlockPos> positions, UUID sound, @Nullable ServerPlayer p, float distance, @Nullable String category, int maxLengthSeconds, boolean byCommand) {
+        UUID channelID = UUID.randomUUID();
+        List<LocationalAudioChannel> channels = positions.stream().map(
+            pos -> createLocationalAudioChannel(UUID.randomUUID(), api, level, pos.getBottomCenter(), category, distance)
+        ).filter(Objects::nonNull).toList();
+
+        if (channels.isEmpty()) {
+            System.out.println("no channels");
+            return null;
+        }
+
+        AtomicBoolean stopped = new AtomicBoolean();
+        AtomicReference<AudioPlayer> playerReference = new AtomicReference<>();
+
+        players.put(channelID, new PlayerReference(() -> {
+            synchronized (stopped) {
+                stopped.set(true);
+                AudioPlayer audioPlayer = playerReference.get();
+                if (audioPlayer != null) {
+                    audioPlayer.stopPlaying();
+                }
+            }
+        }, playerReference, sound, byCommand));
+
+        executor.execute(() -> {
+            MultiLocationalAudioPlayer audioPlayer = playChannels(api, channelID, channels, level, sound, p, maxLengthSeconds);
+            if (audioPlayer == null) {
+                players.remove(channelID);
+                return;
+            }
+            audioPlayer.setOnStopped(() -> players.remove(channelID));
+            synchronized (stopped) {
+                if (!stopped.get()) {
+                    playerReference.set(audioPlayer);
+                } else {
+                    audioPlayer.stopPlaying();
+                }
+            }
+        });
+        return channelID;
+    }
+
+    public static LocationalAudioChannel createLocationalAudioChannel(UUID channelId, VoicechatServerApi api, ServerLevel level, Vec3 pos, String category, float distance) {
+        LocationalAudioChannel channel = api.createLocationalAudioChannel(channelId, api.fromServerLevel(level), api.createPosition(pos.x, pos.y, pos.z));
+        if (channel == null) {
+            return null;
+        }
+        if (category != null) {
+            channel.setCategory(category);
+        }
+        channel.setDistance(distance);
+
+        api.getPlayersInRange(api.fromServerLevel(level), channel.getLocation(), distance + 1F, serverPlayer -> {
+            VoicechatConnection connection = api.getConnectionOf(serverPlayer);
+            if (connection != null) {
+                return connection.isDisabled();
+            }
+            return true;
+        }).stream().map(Player::getPlayer).map(ServerPlayer.class::cast).forEach(player ->
+                player.displayClientMessage(Component.literal("You need to enable voice chat to hear custom audio"), true)
+        );
+
+        return channel;
     }
 
     @Nullable
@@ -115,12 +199,12 @@ public class PlayerManager {
         StaticAudioPlayer staticAudioPlayer = StaticAudioPlayer.create(api, level, sound, p, maxLengthSeconds, category, pos, channelID, distance);
 
         AtomicBoolean stopped = new AtomicBoolean();
-        AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player = new AtomicReference<>();
+        AtomicReference<AudioPlayer> player = new AtomicReference<>();
 
         players.put(channelID, new PlayerReference(() -> {
             synchronized (stopped) {
                 stopped.set(true);
-                de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = player.get();
+                AudioPlayer audioPlayer = player.get();
                 if (audioPlayer != null) {
                     audioPlayer.stopPlaying();
                 }
@@ -146,31 +230,46 @@ public class PlayerManager {
         return channelID;
     }
 
+    @Nullable
+    private MultiLocationalAudioPlayer playChannels(VoicechatServerApi api, UUID channelID, List<LocationalAudioChannel> channels, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
+        short[] audio = getSound(level.getServer(), p, sound, maxLengthSeconds);
+        if (audio == null) return null;
+
+        MultiLocationalAudioPlayer player = new MultiLocationalAudioPlayer(api, api.fromServerLevel(level), channelID, channels, audio);
+        player.startPlaying();
+        return player;
+    }
 
     @Nullable
-    private de.maxhenkel.voicechat.api.audiochannel.AudioPlayer playChannel(VoicechatServerApi api, AudioChannel channel, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
+    private AudioPlayer playChannel(VoicechatServerApi api, AudioChannel channel, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
+        short[] audio = getSound(level.getServer(), p, sound, maxLengthSeconds);
+        if (audio == null) return null;
+
+        AudioPlayer player = api.createAudioPlayer(channel, api.createEncoder(), audio);
+        player.startPlaying();
+        return player;
+    }
+
+    private short @Nullable [] getSound(MinecraftServer server, ServerPlayer p, UUID soundId, int maxLengthSeconds) {
         try {
-            short[] audio = AudioManager.getSound(level.getServer(), sound);
+            short[] audio = AudioManager.getSound(server, soundId);
 
             if (AudioManager.getLengthSeconds(audio) > maxLengthSeconds) {
                 if (p != null) {
                     p.displayClientMessage(Component.literal("Audio is too long to play").withStyle(ChatFormatting.DARK_RED), true);
                 } else {
-                    AudioPlayer.LOGGER.error("Audio {} was too long to play", sound);
+                    AudioPlayerMod.LOGGER.error("Audio {} was too long to play", soundId);
                 }
                 return null;
             }
-
-            de.maxhenkel.voicechat.api.audiochannel.AudioPlayer player = api.createAudioPlayer(channel, api.createEncoder(), audio);
-            player.startPlaying();
-            return player;
+            return audio;
         } catch (Exception e) {
-            AudioPlayer.LOGGER.error("Failed to play audio", e);
+            AudioPlayerMod.LOGGER.error("Failed to play audio", e);
             if (p != null) {
                 p.displayClientMessage(Component.literal("Failed to play audio: %s".formatted(e.getMessage())).withStyle(ChatFormatting.DARK_RED), true);
             }
-            return null;
         }
+        return null;
     }
 
     public void stop(UUID channelID) {
@@ -186,7 +285,7 @@ public class PlayerManager {
         if (player == null) {
             return false;
         }
-        de.maxhenkel.voicechat.api.audiochannel.AudioPlayer p = player.player.get();
+        AudioPlayer p = player.player.get();
         if (p == null) {
             return true;
         }
@@ -207,7 +306,7 @@ public class PlayerManager {
     }
     
     private record PlayerReference(Stoppable onStop,
-                                   AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player, UUID sound, boolean byCommand) {
+                                   AtomicReference<AudioPlayer> player, UUID sound, boolean byCommand) {
     }
 
     @Nullable

@@ -50,7 +50,7 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
         if (loaded == null) {
             loaded = FabricLoader.getInstance().isModLoaded("fabric-permissions-api-v0");
             if (loaded) {
-                AudioPlayer.LOGGER.info("Using Fabric Permissions API");
+                AudioPlayerMod.LOGGER.info("Using Fabric Permissions API");
             }
         }
         return loaded;
@@ -101,7 +101,7 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
 
         @Override
         public boolean hasPermission(@Nullable ServerPlayer player) {
-            return AudioPlayer.SERVER_CONFIG.allowStaticAudio.get() && super.hasPermission(player);
+            return AudioPlayerMod.SERVER_CONFIG.allowStaticAudio.get() && super.hasPermission(player);
         }
     }
 

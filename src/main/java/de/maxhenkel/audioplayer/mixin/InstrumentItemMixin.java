@@ -38,7 +38,7 @@ public class InstrumentItemMixin {
             return;
         }
         player.startUsingItem(interactionHand);
-        player.getCooldowns().addCooldown(itemInHand.getItem(), AudioPlayer.SERVER_CONFIG.goatHornCooldown.get());
+        player.getCooldowns().addCooldown(itemInHand.getItem(), AudioPlayerMod.SERVER_CONFIG.goatHornCooldown.get());
         level.gameEvent(GameEvent.INSTRUMENT_PLAY, player.position(), GameEvent.Context.of(player));
         ci.setReturnValue(InteractionResultHolder.consume(itemInHand));
     }
