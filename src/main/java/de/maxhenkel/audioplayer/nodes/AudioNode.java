@@ -20,6 +20,7 @@ public abstract class AudioNode {
     // statics
     protected static final int TRANSMIT_RADIUS = 16;
     protected static final int MAX_DEPTH = 8;
+    protected static final int MAX_SPEAKERS = 32;
     // settings
     public final ServerPosition position;
     // state
@@ -124,24 +125,26 @@ public abstract class AudioNode {
     }
 
     public List<SpeakerNode> getSpeakers() {
-        return getSpeakers(new ArrayList<>());
+        List<SpeakerNode> speakers = new ArrayList<>();
+        getSpeakers(speakers, MAX_DEPTH);
+        return speakers;
     }
 
-    private List<SpeakerNode> getSpeakers(List<SpeakerNode> speakers) {
-        if (transmittingTo == null) return new ArrayList<>();
-        // get all speakers
-        transmittingTo.forEach(node -> {
-            if (node instanceof SpeakerNode speakerNode && !speakers.contains(speakerNode)) {
+    private void getSpeakers(List<SpeakerNode> speakers, int depth) {
+        if (speakers.size() >= MAX_SPEAKERS) return;
+        // if self speaker
+        if (this instanceof SpeakerNode speakerNode) {
+            if (!speakers.contains(speakerNode))
                 speakers.add(speakerNode);
-                triggerSensor(this, speakerNode);
-            }
-        });
+            else return;
+        }
+        // if reached max range, or can't transmit
+        if (depth == 0 || transmittingTo == null) return;
         // repeat signal
         transmittingTo.forEach(node -> {
-            speakers.addAll(node.getSpeakers());
+            node.getSpeakers(speakers, depth - 1);
             triggerSensor(this, node);
         });
-        return speakers;
     }
 
     private void triggerSensor(AudioNode transmitNode, AudioNode receiveNode) {
