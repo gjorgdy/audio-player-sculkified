@@ -1,5 +1,6 @@
 package de.maxhenkel.audioplayer;
 
+import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
@@ -140,7 +141,7 @@ public class AudioManager {
 
 
     @Nullable
-    public static UUID playMultiple(ServerLevel level, List<BlockPos> positions, PlayerType type, CustomSound sound, @Nullable Player player) {
+    public static UUID playMultiple(ServerLevel level, List<SpeakerNode> positions, PlayerType type, CustomSound sound, @Nullable Player player) {
         float range = sound.getRange(type);
 
         VoicechatServerApi api = Plugin.voicechatServerApi;
@@ -154,8 +155,6 @@ public class AudioManager {
                 positions,
                 sound.getSoundId(),
                 (player instanceof ServerPlayer p) ? p : null,
-                range,
-                type.getCategory(),
                 type.getMaxDuration().get()
         );
     }

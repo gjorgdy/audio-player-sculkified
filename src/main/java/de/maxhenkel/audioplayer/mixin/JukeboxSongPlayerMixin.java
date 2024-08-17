@@ -2,7 +2,8 @@ package de.maxhenkel.audioplayer.mixin;
 
 import de.maxhenkel.audioplayer.*;
 import de.maxhenkel.audioplayer.interfaces.CustomJukeboxSongPlayer;
-import de.maxhenkel.voicechat.api.Position;
+import de.maxhenkel.audioplayer.nodes.SourceNode;
+import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
@@ -25,27 +26,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 @Mixin(JukeboxSongPlayer.class)
 public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer {
 
+    // shadow
     @Shadow
     @Nullable
     private Holder<JukeboxSong> song;
     @Shadow
     @Final
     private JukeboxSongPlayer.OnSongChanged onSongChanged;
-
     @Shadow
     private long ticksSinceSongStarted;
-
     @Shadow
     @Final
     private BlockPos blockPos;
+    // end of shadow
 
     @Unique
     @Nullable
@@ -53,7 +52,13 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
     @Unique
     private boolean hasShrieker = false;
     @Unique
-    private final List<UUID> speakerChannelIDs = new ArrayList<>();
+    private SourceNode sourceNode;
+    @Unique
+    private List<SpeakerNode> speakerNodes;
+
+    @Shadow
+    private static void spawnMusicParticles(LevelAccessor levelAccessor, BlockPos blockPos) {
+    }
 
     @Override
     public UUID audioplayer$getPlayerUUID() {
@@ -62,11 +67,16 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
 
     @Override
     public boolean audioplayer$customPlay(ServerLevel level, ItemStack item) {
+        if (sourceNode == null) {
+            sourceNode = (SourceNode) SpeakerManager.instance().getNode(
+                ServerPosition.create(level, blockPos),
+                true
+            );
+        }
         CustomSound customSound = CustomSound.of(item);
         if (customSound == null) {
             return false;
         }
-        speakerChannelIDs.clear();
         song = null;
         // check if jukebox has shrieker
         hasShrieker = level.getBlockState(blockPos.above()).is(Blocks.SCULK_SHRIEKER);
@@ -77,11 +87,12 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
                 return false;
             }
             playerID = jukeboxChannel;
-        // get note blocks around it
+            // get note blocks around it
         } else {
-            SpeakerConnector connector = SpeakerManager.transmit(level, blockPos);
-            if (connector.getNoteBlockPositions().isEmpty()) return true;
-            playerID = AudioManager.playMultiple(level, connector.getNoteBlockPositions(), PlayerType.MUSIC_DISC, customSound, null);
+            speakerNodes = sourceNode.getSpeakers();
+            speakerNodes.forEach(speakerNode -> speakerNode.setSourceNode(sourceNode));
+            playerID = AudioManager.playMultiple(level, speakerNodes, PlayerType.MUSIC_DISC, customSound, null);
+            sourceNode.setPlayerID(playerID);
         }
         ticksSinceSongStarted = 0L;
         onSongChanged.notifyChange();
@@ -95,7 +106,7 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         }
         PlayerManager playerManager = PlayerManager.instance();
         playerManager.stop(playerID);
-        speakerChannelIDs.forEach(playerManager::stop);
+        if (sourceNode != null) sourceNode.setPlayerID(null);
         playerID = null;
         song = null;
         ticksSinceSongStarted = 0L;
@@ -127,23 +138,20 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         if (shouldEmitJukeboxPlayingEvent()) {
             if (hasShrieker && levelAccessor instanceof ServerLevel serverLevel) {
                 // particles of the shrieker
-                for(int ah = 0; ah < 5; ++ah) {
+                for (int ah = 0; ah < 5; ++ah) {
                     serverLevel.sendParticles(
-                        new ShriekParticleOption(ah * 5),
-                            (double)blockPos.getX() + 0.5,
-                            (double)blockPos.getY() + 1.5,
-                            (double)blockPos.getZ() + 0.5,
+                            new ShriekParticleOption(ah * 5),
+                            (double) blockPos.getX() + 0.5,
+                            (double) blockPos.getY() + 1.5,
+                            (double) blockPos.getZ() + 0.5,
                             1, 0.0, 0.0, 0.0, 0.0
                     );
                 }
                 // notes on speakers
-                Collection<Position> speakerPositions = PlayerManager.instance().getSpeakerPositions(playerID);
-                if (speakerPositions != null) {
-                    speakerPositions.forEach(pos -> {
-                        BlockPos sensorBlockPos = new BlockPos((int) (pos.getX() - 0.5), (int) (pos.getY() + 1), (int) (pos.getZ() - 0.5));
-                        spawnMusicParticles(levelAccessor, sensorBlockPos);
-                    });
-                }
+                speakerNodes.forEach(speakerNode -> {
+                    if (speakerNode.isPlaying())
+                        spawnMusicParticles(levelAccessor, speakerNode.position.fabricBlockPos());
+                });
             } else {
                 spawnMusicParticles(levelAccessor, blockPos);
             }
@@ -173,9 +181,5 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
 
     @Shadow
     protected abstract boolean shouldEmitJukeboxPlayingEvent();
-
-    @Shadow
-    private static void spawnMusicParticles(LevelAccessor levelAccessor, BlockPos blockPos) {
-    }
 
 }

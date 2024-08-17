@@ -3,6 +3,7 @@ package de.maxhenkel.audioplayer.mixin;
 import de.maxhenkel.audioplayer.*;
 import de.maxhenkel.audioplayer.interfaces.ChannelHolder;
 import de.maxhenkel.audioplayer.interfaces.CustomSoundHolder;
+import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -16,7 +17,6 @@ import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.UUID;
@@ -58,31 +58,47 @@ public class NoteBlockMixin extends Block {
         }
     }
 
-    @Inject(method = "neighborChanged", at = @At("HEAD"))
-    public void onNeighbourChanged(BlockState blockState, Level level, BlockPos blockPos, Block block, BlockPos blockPos2, boolean bl, CallbackInfo ci) {
-        // if block above is a sculk sensor, and speaker is not active
+//    @Inject(method = "neighborChanged", at = @At("HEAD"))
+//    public void onNeighbourChanged(BlockState blockState, Level level, BlockPos blockPos, Block block, BlockPos blockPos2, boolean bl, CallbackInfo ci) {
+//        // try to get a speaker node
+//        ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, blockPos);
+//        AudioNode node = SpeakerManager.instance().getNode(serverPosition,  false);
+//        // if block above is a sculk sensor, but it doesn't have a node
+//        if ((level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
+//                || level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR))
+//                && node == null
+//        ) {
+//            node = SpeakerManager.instance().createNode(serverPosition);
+////            if (node != null) {
+////                node.scan();
+////            }
+//        }
+//        // if block above is not a sculk sensor, but there is a node
+//        else if (!level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
+//                && !level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR)
+//                && node != null
+//        ) {
+//            node.disconnect();
+//        }
+//    }
+
+    @Override
+    protected void onPlace(@NotNull BlockState blockState, Level level, BlockPos blockPos, @NotNull BlockState blockState2, boolean bl) {
         if ((level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
                 || level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR))
-                && !SpeakerManager.instance().isSpeakerActive((ServerLevel) level, blockPos)
         ) {
-            SpeakerConnector connector = SpeakerManager.receive((ServerLevel) level, blockPos);
-            BlockPos jukeboxPosition = connector.getJukeboxPosition();
-            if (jukeboxPosition == null) return;
-            SpeakerManager.instance().connectSpeaker((ServerLevel) level, jukeboxPosition, blockPos);
+            ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, blockPos);
+            SpeakerManager.instance().createNode(serverPosition);
         }
-        // if block above is not a sculk sensor, but speaker is active
-        else if (!level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
-                && !level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR)
-                && SpeakerManager.instance().isSpeakerActive((ServerLevel) level, blockPos)
-        ) {
-            SpeakerManager.instance().disconnectSpeaker((ServerLevel) level, blockPos);
-        }
+        super.onPlace(blockState, level, blockPos, blockState2, bl);
     }
 
     @Override
     public void destroy(@NotNull LevelAccessor levelAccessor, @NotNull BlockPos blockPos, @NotNull BlockState blockState) {
-        if (SpeakerManager.instance().isSpeakerActive((ServerLevel) levelAccessor, blockPos))
-            SpeakerManager.instance().disconnectSpeaker((ServerLevel) levelAccessor, blockPos);
+        ServerPosition serverPosition = ServerPosition.create((ServerLevel) levelAccessor, blockPos);
+        if (SpeakerManager.instance().getNode(serverPosition, false) instanceof SpeakerNode speakerNode) {
+            speakerNode.disconnect();
+        }
         BlockEntity blockEntity = levelAccessor.getBlockEntity(blockPos.above());
         if (blockEntity instanceof ChannelHolder channelHolder) {
             UUID channelID = channelHolder.audioplayer$getChannelID();

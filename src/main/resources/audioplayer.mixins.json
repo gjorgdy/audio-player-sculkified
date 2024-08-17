@@ -4,13 +4,16 @@
   "package": "de.maxhenkel.audioplayer.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "JukeboxBlockEntityMixin",
-    "InstrumentItemMixin",
-    "NoteBlockMixin",
-    "SkullBlockEntityMixin",
-    "BlockMixin",
     "AbstractSkullBlockMixin",
-    "JukeboxSongPlayerMixin"
+    "BlockMixin",
+    "InstrumentItemMixin",
+    "JukeboxBlockEntityMixin",
+    "JukeboxSongPlayerMixin",
+    "NoteBlockMixin",
+    "SculkSensorBlockEntityMixin",
+    "SculkSensorBlockMixin",
+    "SculkShriekerBlockEntityMixin",
+    "SkullBlockEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

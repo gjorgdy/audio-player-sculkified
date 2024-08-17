@@ -33,22 +33,20 @@ public class AudioPlayerMod implements ModInitializer {
     public static ScheduledExecutorService SCHEDULED_EXECUTOR = Executors.newScheduledThreadPool(1, r -> {
         Thread thread = new Thread(r, "AudioPlayerExecutor");
         thread.setDaemon(true);
-        thread.setUncaughtExceptionHandler((t, e) -> {
-            AudioPlayerMod.LOGGER.error("Uncaught exception in thread {}", t.getName(), e);
-        });
+        thread.setUncaughtExceptionHandler((t, e) -> AudioPlayerMod.LOGGER.error("Uncaught exception in thread {}", t.getName(), e));
         return thread;
     });
 
     @Override
     public void onInitialize() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
             MinecraftAdmiral.builder(dispatcher, registryAccess).addCommandClasses(
-                    UploadCommands.class,
-                    ApplyCommands.class,
-                    UtilityCommands.class,
-                    PlayCommands.class
-            ).setPermissionManager(AudioPlayerPermissionManager.INSTANCE).build();
-        });
+                UploadCommands.class,
+                ApplyCommands.class,
+                UtilityCommands.class,
+                PlayCommands.class
+            ).setPermissionManager(AudioPlayerPermissionManager.INSTANCE).build()
+        );
 
         FileNameManager.init();
         Path configFolder = FabricLoader.getInstance().getConfigDir().resolve(MODID);
@@ -69,5 +67,6 @@ public class AudioPlayerMod implements ModInitializer {
 
         ServerLifecycleEvents.SERVER_STARTED.register(WebServerEvents::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(WebServerEvents::onServerStopped);
+
     }
 }
