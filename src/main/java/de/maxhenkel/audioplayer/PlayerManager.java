@@ -261,6 +261,15 @@ public class PlayerManager {
         return p.isPlaying();
     }
 
+    private interface Stoppable {
+        void stop();
+    }
+
+    private record PlayerReference(Stoppable onStop,
+                                   AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player,
+                                   UUID sound, boolean byCommand) {
+    }
+
     @Nullable
     public UUID findChannelID(UUID sound, boolean onlyByCommand) {
         for (Map.Entry<UUID, PlayerReference> entry : players.entrySet()) {
@@ -269,14 +278,6 @@ public class PlayerManager {
             }
         }
         return null;
-    }
-
-    private interface Stoppable {
-        void stop();
-    }
-
-    private record PlayerReference(Stoppable onStop,
-                                   AtomicReference<AudioPlayer> player, UUID sound, boolean byCommand) {
     }
 
 }

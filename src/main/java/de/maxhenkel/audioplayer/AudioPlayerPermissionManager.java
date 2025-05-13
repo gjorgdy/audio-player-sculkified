@@ -7,13 +7,13 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
 
-import javax.annotation.Nullable;
 import java.util.List;
 
 public class AudioPlayerPermissionManager implements PermissionManager<CommandSourceStack> {
 
     public static final AudioPlayerPermissionManager INSTANCE = new AudioPlayerPermissionManager();
 
+    private static final Permission VOLUME_PERMISSION = new Permission("audioplayer.volume", PermissionType.EVERYONE);
     private static final Permission UPLOAD_PERMISSION = new Permission("audioplayer.upload", PermissionType.EVERYONE);
     private static final Permission APPLY_PERMISSION = new Permission("audioplayer.apply", PermissionType.EVERYONE);
     private static final Permission APPLY_ANNOUNCER_PERMISSION = new AnnouncerPermission("audioplayer.set_static", PermissionType.EVERYONE);
@@ -23,7 +23,8 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
             UPLOAD_PERMISSION,
             APPLY_PERMISSION,
             APPLY_ANNOUNCER_PERMISSION,
-            PLAY_COMMAND_PERMISSION
+            PLAY_COMMAND_PERMISSION,
+            VOLUME_PERMISSION
     );
 
     @Override
@@ -32,14 +33,13 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
             if (!p.permission.equals(permission)) {
                 continue;
             }
+            if (!p.canUse()) {
+                return false;
+            }
             if (stack.isPlayer()) {
                 return p.hasPermission(stack.getPlayer());
             }
-            if (p.getType().equals(PermissionType.OPS)) {
-                return stack.hasPermission(2);
-            } else {
-                return p.hasPermission(null);
-            }
+            return stack.hasPermission(2);
         }
         return false;
     }
@@ -65,27 +65,24 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
             this.type = type;
         }
 
-        public boolean hasPermission(@Nullable ServerPlayer player) {
+        public boolean canUse() {
+            return true;
+        }
+
+        public boolean hasPermission(ServerPlayer player) {
             if (isFabricPermissionsAPILoaded()) {
                 return checkFabricPermission(player);
             }
             return type.hasPermission(player);
         }
 
-        private boolean checkFabricPermission(@Nullable ServerPlayer player) {
-            if (player == null) {
-                return false;
-            }
+        private boolean checkFabricPermission(ServerPlayer player) {
             TriState permissionValue = Permissions.getPermissionValue(player, permission);
-            switch (permissionValue) {
-                case DEFAULT:
-                    return type.hasPermission(player);
-                case TRUE:
-                    return true;
-                case FALSE:
-                default:
-                    return false;
-            }
+            return switch (permissionValue) {
+                case DEFAULT -> type.hasPermission(player);
+                case TRUE -> true;
+                default -> false;
+            };
         }
 
         public PermissionType getType() {
@@ -100,8 +97,8 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
         }
 
         @Override
-        public boolean hasPermission(@Nullable ServerPlayer player) {
-            return AudioPlayerMod.SERVER_CONFIG.allowStaticAudio.get() && super.hasPermission(player);
+        public boolean canUse() {
+            return AudioPlayerMod.SERVER_CONFIG.allowStaticAudio.get() && super.canUse();
         }
     }
 
@@ -109,7 +106,7 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
 
         EVERYONE, NOONE, OPS;
 
-        boolean hasPermission(@Nullable ServerPlayer player) {
+        boolean hasPermission(ServerPlayer player) {
             return switch (this) {
                 case EVERYONE -> true;
                 case NOONE -> false;

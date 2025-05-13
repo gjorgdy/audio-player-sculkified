@@ -2,27 +2,58 @@ package de.maxhenkel.audioplayer.command;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import de.maxhenkel.admiral.annotations.Command;
-import de.maxhenkel.admiral.annotations.RequiresPermission;
-import de.maxhenkel.audioplayer.CustomSound;
-import de.maxhenkel.audioplayer.FileNameManager;
-import de.maxhenkel.audioplayer.PlayerType;
+import de.maxhenkel.admiral.annotations.*;
+import de.maxhenkel.audioplayer.*;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.*;
+import net.minecraft.world.item.component.InstrumentComponent;
+import net.minecraft.world.item.component.TooltipDisplay;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.UUID;
 
 @Command("audioplayer")
 public class UtilityCommands {
+    @RequiresPermission("audioplayer.apply")
+    @Command("set_random")
+    public void set_random(CommandContext<CommandSourceStack> context, @Name("enabled") boolean enabled) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        ItemStack itemInHand = player.getItemInHand(InteractionHand.MAIN_HAND);
+
+        PlayerType playerType = PlayerType.fromItemStack(itemInHand);
+        if (playerType == null) {
+            context.getSource().sendFailure(Component.nullToEmpty("Invalid Item"));
+            return;
+        }
+
+        CustomSound sound = getHeldSound(context);
+
+        if (sound == null) {
+            return;
+        }
+
+        sound.setRandomization(enabled);
+
+        sound.saveToItem(itemInHand, null, false);
+
+        if (enabled) {
+            context.getSource().sendSuccess(() -> Component.literal("Successfully enabled randomization, more sounds can now be added to this item"), false);
+        } else {
+            context.getSource().sendSuccess(() -> Component.literal("Successfully disabled randomization, extra sounds have been removed"), false);
+        }
+    }
 
     @RequiresPermission("audioplayer.apply")
     @Command("clear")
@@ -42,8 +73,8 @@ public class UtilityCommands {
         }
 
         if (itemInHand.has(DataComponents.INSTRUMENT)) {
-            Optional<Holder.Reference<Instrument>> holder = BuiltInRegistries.INSTRUMENT.getHolder(Instruments.PONDER_GOAT_HORN);
-            holder.ifPresent(instrumentReference -> itemInHand.set(DataComponents.INSTRUMENT, instrumentReference));
+            Optional<Holder.Reference<Instrument>> holder = context.getSource().getServer().registryAccess().lookupOrThrow(Registries.INSTRUMENT).get(Instruments.PONDER_GOAT_HORN);
+            holder.ifPresent(instrumentReference -> itemInHand.set(DataComponents.INSTRUMENT, new InstrumentComponent(instrumentReference)));
         }
         if (itemInHand.has(DataComponents.JUKEBOX_PLAYABLE)) {
             JukeboxPlayable jukeboxPlayable = itemInHand.getItem().components().get(DataComponents.JUKEBOX_PLAYABLE);
@@ -54,8 +85,12 @@ public class UtilityCommands {
             }
         }
 
-        if (itemInHand.has(DataComponents.HIDE_ADDITIONAL_TOOLTIP)) {
-            itemInHand.remove(DataComponents.HIDE_ADDITIONAL_TOOLTIP);
+        TooltipDisplay tooltipDisplay = itemInHand.get(DataComponents.TOOLTIP_DISPLAY);
+        if (tooltipDisplay != null) {
+            LinkedHashSet<DataComponentType<?>> hiddenComponents = new LinkedHashSet<>(tooltipDisplay.hiddenComponents());
+            hiddenComponents.remove(DataComponents.JUKEBOX_PLAYABLE);
+            hiddenComponents.remove(DataComponents.INSTRUMENT);
+            itemInHand.set(DataComponents.TOOLTIP_DISPLAY, new TooltipDisplay(tooltipDisplay.hideTooltip(), hiddenComponents));
         }
 
         if (itemInHand.has(DataComponents.LORE)) {
@@ -69,6 +104,15 @@ public class UtilityCommands {
     public void id(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         CustomSound customSound = getHeldSound(context);
         if (customSound == null) {
+            return;
+        }
+        if (customSound.isRandomized()) {
+            ArrayList<UUID> sounds = customSound.getRandomSounds();
+            context.getSource().sendSuccess(() -> Component.literal("Item contains %d sounds".formatted(sounds.size())), false);
+            for (int i = 0; i < sounds.size(); i++) {
+                int finalI = i;
+                context.getSource().sendSuccess(() -> UploadCommands.sendUUIDMessage(sounds.get(finalI), Component.literal("Sound %d.".formatted(finalI))), false);
+            }
             return;
         }
         context.getSource().sendSuccess(() -> UploadCommands.sendUUIDMessage(customSound.getSoundId(), Component.literal("Successfully extracted sound ID.")), false);
@@ -88,7 +132,21 @@ public class UtilityCommands {
         }
 
         FileNameManager mgr = optionalMgr.get();
-        String fileName = mgr.getFileName(customSound.getSoundId());
+
+        if (customSound.isRandomized()) {
+            ArrayList<UUID> sounds = customSound.getRandomSounds();
+            context.getSource().sendSuccess(() -> Component.literal("Item contains %d sounds".formatted(sounds.size())), false);
+            for (UUID sound : sounds) {
+                sendSoundName(context, mgr, sound);
+            }
+            return;
+        }
+
+        sendSoundName(context, mgr, customSound.getSoundId());
+    }
+
+    public static void sendSoundName(CommandContext<CommandSourceStack> context, FileNameManager mgr, UUID id) {
+        String fileName = mgr.getFileName(id);
         if (fileName == null) {
             context.getSource().sendFailure(Component.literal("Custom audio does not have an associated file name"));
             return;
@@ -97,12 +155,12 @@ public class UtilityCommands {
         context.getSource().sendSuccess(() -> Component.literal("Audio file name: ").append(Component.literal(fileName).withStyle(style -> {
             return style
                     .withColor(ChatFormatting.GREEN)
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Click to copy")))
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, fileName));
+                    .withHoverEvent(new HoverEvent.ShowText(Component.literal("Click to copy")))
+                    .withClickEvent(new ClickEvent.CopyToClipboard(fileName));
         })), false);
     }
 
-    private static CustomSound getHeldSound(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    public static CustomSound getHeldSound(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ItemStack itemInHand = player.getItemInHand(InteractionHand.MAIN_HAND);
 

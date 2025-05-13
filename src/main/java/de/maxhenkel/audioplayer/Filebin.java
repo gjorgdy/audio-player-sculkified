@@ -9,6 +9,7 @@ import net.minecraft.server.MinecraftServer;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -18,12 +19,12 @@ public class Filebin {
 
     public static final String USER_AGENT = "AudioPlayer/curl";
 
-    public static void downloadSound(MinecraftServer server, UUID sound) throws IOException, InterruptedException, UnsupportedAudioFileException {
-        String url = getBin(sound);
+    public static void downloadSound(MinecraftServer server, UUID sound) throws IOException, InterruptedException, UnsupportedAudioFileException, URISyntaxException {
+        URI url = getBin(sound);
 
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+                    .uri(url)
                     .header("Accept", "application/json")
                     .header("User-Agent", USER_AGENT)
                     .build();
@@ -64,7 +65,7 @@ public class Filebin {
                     }
 
                     String filename = file.get("filename").getAsString();
-                    AudioManager.saveSound(server, sound, url + "/" + filename);
+                    AudioManager.saveSound(server, sound, url + "/" + new URI(null, null, filename, null).toASCIIString());
                     deleteBin(url);
                     return;
                 }
@@ -73,10 +74,10 @@ public class Filebin {
         }
     }
 
-    public static void deleteBin(String url) {
+    public static void deleteBin(URI url) {
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+                    .uri(url)
                     .header("Accept", "application/json")
                     .header("User-Agent", USER_AGENT)
                     .DELETE()
@@ -91,14 +92,14 @@ public class Filebin {
         }
     }
 
-    public static String getBin(UUID sound) {
+    public static URI getBin(UUID sound) {
         String filebinUrl = AudioPlayerMod.SERVER_CONFIG.filebinUrl.get();
 
         if (!filebinUrl.endsWith("/")) {
             filebinUrl += "/";
         }
 
-        return filebinUrl + sound;
+        return URI.create(filebinUrl + sound);
     }
 
 }
