@@ -34,7 +34,7 @@ public class FileNameManager {
             }.getType();
             fileNames = gson.fromJson(reader, fileNameMapType);
         } catch (Exception e) {
-            AudioPlayerMod.LOGGER.error("Failed to load file name mappings", e);
+            AudioPlayer.LOGGER.error("Failed to load file name mappings", e);
         }
         if (fileNames == null) {
             fileNames = new HashMap<>();
@@ -47,7 +47,7 @@ public class FileNameManager {
         try (Writer writer = new FileWriter(file)) {
             gson.toJson(fileNames, writer);
         } catch (Exception e) {
-            AudioPlayerMod.LOGGER.error("Failed to save file name mappings", e);
+            AudioPlayer.LOGGER.error("Failed to save file name mappings", e);
         }
     }
 
@@ -136,13 +136,13 @@ public class FileNameManager {
 
     public static void init() {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            AudioPlayerMod.LOGGER.info("Loading audio file name mappings...");
+            AudioPlayer.LOGGER.info("Loading audio file name mappings...");
             Path audioDataFolder = AudioManager.getAudioDataFolder(server);
             if (Files.exists(audioDataFolder)) {
                 try {
                     Files.createDirectories(audioDataFolder);
                 } catch (IOException e) {
-                    AudioPlayerMod.LOGGER.error("Failed to create audio data folder", e);
+                    AudioPlayer.LOGGER.error("Failed to create audio data folder", e);
                     return;
                 }
             }

@@ -19,7 +19,7 @@ import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-public class AudioPlayerMod implements ModInitializer {
+public class AudioPlayer implements ModInitializer {
 
     public static final String MODID = "audioplayer";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
@@ -30,7 +30,7 @@ public class AudioPlayerMod implements ModInitializer {
     public static ScheduledExecutorService SCHEDULED_EXECUTOR = Executors.newScheduledThreadPool(1, r -> {
         Thread thread = new Thread(r, "AudioPlayerExecutor");
         thread.setDaemon(true);
-        thread.setUncaughtExceptionHandler((t, e) -> AudioPlayerMod.LOGGER.error("Uncaught exception in thread {}", t.getName(), e));
+        thread.setUncaughtExceptionHandler((t, e) -> AudioPlayer.LOGGER.error("Uncaught exception in thread {}", t.getName(), e));
         return thread;
     });
 

@@ -5,7 +5,6 @@ import de.maxhenkel.voicechat.api.Player;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
-import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -80,12 +79,12 @@ public class PlayerManager {
         LocationalAudioChannel channel = createLocationalAudioChannel(channelID, api, level, pos, category, distance);
 
         AtomicBoolean stopped = new AtomicBoolean();
-        AtomicReference<AudioPlayer> player = new AtomicReference<>();
+        AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player = new AtomicReference<>();
 
         players.put(channelID, new PlayerReference(() -> {
             synchronized (stopped) {
                 stopped.set(true);
-                AudioPlayer audioPlayer = player.get();
+                de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = player.get();
                 if (audioPlayer != null) {
                     audioPlayer.stopPlaying();
                 }
@@ -93,7 +92,7 @@ public class PlayerManager {
         }, player, sound, byCommand));
 
         executor.execute(() -> {
-            AudioPlayer audioPlayer = playChannel(api, channel, level, sound, p, maxLengthSeconds);
+            de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = playChannel(api, channel, level, sound, p, maxLengthSeconds);
             if (audioPlayer == null) {
                 players.remove(channelID);
                 return;
@@ -120,12 +119,12 @@ public class PlayerManager {
         UUID channelID = UUID.randomUUID();
 
         AtomicBoolean stopped = new AtomicBoolean();
-        AtomicReference<AudioPlayer> playerReference = new AtomicReference<>();
+        AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> playerReference = new AtomicReference<>();
 
         players.put(channelID, new PlayerReference(() -> {
             synchronized (stopped) {
                 stopped.set(true);
-                AudioPlayer audioPlayer = playerReference.get();
+                de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = playerReference.get();
                 if (audioPlayer != null) {
                     audioPlayer.stopPlaying();
                 }
@@ -170,12 +169,12 @@ public class PlayerManager {
         StaticAudioPlayer staticAudioPlayer = StaticAudioPlayer.create(api, level, sound, p, maxLengthSeconds, category, pos, channelID, distance);
 
         AtomicBoolean stopped = new AtomicBoolean();
-        AtomicReference<AudioPlayer> player = new AtomicReference<>();
+        AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player = new AtomicReference<>();
 
         players.put(channelID, new PlayerReference(() -> {
             synchronized (stopped) {
                 stopped.set(true);
-                AudioPlayer audioPlayer = player.get();
+                de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = player.get();
                 if (audioPlayer != null) {
                     audioPlayer.stopPlaying();
                 }
@@ -210,11 +209,11 @@ public class PlayerManager {
     }
 
     @Nullable
-    private AudioPlayer playChannel(VoicechatServerApi api, AudioChannel channel, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
+    private de.maxhenkel.voicechat.api.audiochannel.AudioPlayer playChannel(VoicechatServerApi api, AudioChannel channel, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
         short[] audio = getSound(level.getServer(), p, sound, maxLengthSeconds);
         if (audio == null) return null;
 
-        AudioPlayer player = api.createAudioPlayer(channel, api.createEncoder(), audio);
+        de.maxhenkel.voicechat.api.audiochannel.AudioPlayer player = api.createAudioPlayer(channel, api.createEncoder(), audio);
         player.startPlaying();
         return player;
     }
@@ -227,13 +226,13 @@ public class PlayerManager {
                 if (p != null) {
                     p.displayClientMessage(Component.literal("Audio is too long to play").withStyle(ChatFormatting.DARK_RED), true);
                 } else {
-                    AudioPlayerMod.LOGGER.error("Audio {} was too long to play", soundId);
+                    AudioPlayer.LOGGER.error("Audio {} was too long to play", soundId);
                 }
                 return null;
             }
             return audio;
         } catch (Exception e) {
-            AudioPlayerMod.LOGGER.error("Failed to play audio", e);
+            AudioPlayer.LOGGER.error("Failed to play audio", e);
             if (p != null) {
                 p.displayClientMessage(Component.literal("Failed to play audio: %s".formatted(e.getMessage())).withStyle(ChatFormatting.DARK_RED), true);
             }
@@ -254,7 +253,7 @@ public class PlayerManager {
         if (player == null) {
             return false;
         }
-        AudioPlayer p = player.player.get();
+        de.maxhenkel.voicechat.api.audiochannel.AudioPlayer p = player.player.get();
         if (p == null) {
             return true;
         }

@@ -72,7 +72,7 @@ public class AudioManager {
     }
 
     public static void saveSound(MinecraftServer server, UUID id, String url) throws UnsupportedAudioFileException, IOException {
-        byte[] data = download(new URL(url), AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get());
+        byte[] data = download(new URL(url), AudioPlayer.SERVER_CONFIG.maxUploadSize.get());
         saveSound(server, id, FileNameManager.getFileNameFromUrl(url), data);
     }
 
@@ -99,8 +99,8 @@ public class AudioManager {
         }
 
         long size = Files.size(file);
-        if (size > AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get()) {
-            throw new IOException("Maximum file size exceeded (%sMB>%sMB)".formatted(Math.round((float) size / 1_000_000F), Math.round(AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get().floatValue() / 1_000_000F)));
+        if (size > AudioPlayer.SERVER_CONFIG.maxUploadSize.get()) {
+            throw new IOException("Maximum file size exceeded (%sMB>%sMB)".formatted(Math.round((float) size / 1_000_000F), Math.round(AudioPlayer.SERVER_CONFIG.maxUploadSize.get().floatValue() / 1_000_000F)));
         }
 
         AudioConverter.AudioType audioType = AudioConverter.getAudioType(file);
@@ -121,12 +121,12 @@ public class AudioManager {
             throw new UnsupportedAudioFileException("Unsupported audio format");
         }
         if (audioType.equals(AudioConverter.AudioType.MP3)) {
-            if (!AudioPlayerMod.SERVER_CONFIG.allowMp3Upload.get()) {
+            if (!AudioPlayer.SERVER_CONFIG.allowMp3Upload.get()) {
                 throw new UnsupportedAudioFileException("Uploading mp3 files is not allowed on this server");
             }
         }
         if (audioType.equals(AudioConverter.AudioType.WAV)) {
-            if (!AudioPlayerMod.SERVER_CONFIG.allowWavUpload.get()) {
+            if (!AudioPlayer.SERVER_CONFIG.allowWavUpload.get()) {
                 throw new UnsupportedAudioFileException("Uploading wav files is not allowed on this server");
             }
         }
@@ -201,7 +201,7 @@ public class AudioManager {
                     type.getCategory(),
                     type.getMaxDuration().get()
             );
-        } else if (sound.isStaticSound() && AudioPlayerMod.SERVER_CONFIG.allowStaticAudio.get()) { //TODO Move option
+        } else if (sound.isStaticSound() && AudioPlayer.SERVER_CONFIG.allowStaticAudio.get()) { //TODO Move option
             channelID = PlayerManager.instance().playStatic(
                     api,
                     level,

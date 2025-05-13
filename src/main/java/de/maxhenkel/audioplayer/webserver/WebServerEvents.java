@@ -1,6 +1,6 @@
 package de.maxhenkel.audioplayer.webserver;
 
-import de.maxhenkel.audioplayer.AudioPlayerMod;
+import de.maxhenkel.audioplayer.AudioPlayer;
 import net.minecraft.server.MinecraftServer;
 
 import javax.annotation.Nullable;
@@ -12,20 +12,20 @@ public class WebServerEvents {
 
     public static void onServerStarted(MinecraftServer server) {
         closeServerIfRunning();
-        if (!AudioPlayerMod.SERVER_CONFIG.runWebServer.get()) {
+        if (!AudioPlayer.SERVER_CONFIG.runWebServer.get()) {
             return;
         }
         try {
             webServer = WebServer.create(server).start();
-            AudioPlayerMod.LOGGER.info("Audio player upload web server started on port {}", webServer.getPort());
+            AudioPlayer.LOGGER.info("Audio player upload web server started on port {}", webServer.getPort());
         } catch (Exception e) {
-            AudioPlayerMod.LOGGER.error("Failed to start web server", e);
+            AudioPlayer.LOGGER.error("Failed to start web server", e);
         }
     }
 
     public static void onServerStopped(MinecraftServer server) {
         if (webServer != null) {
-            AudioPlayerMod.LOGGER.info("Audio player upload web server stopped");
+            AudioPlayer.LOGGER.info("Audio player upload web server stopped");
         }
         closeServerIfRunning();
     }

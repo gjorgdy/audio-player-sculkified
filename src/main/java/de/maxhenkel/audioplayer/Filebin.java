@@ -60,8 +60,8 @@ public class Filebin {
                 if (contentType.equals("audio/wav") || contentType.equals("audio/mpeg")) {
                     long size = file.get("bytes").getAsLong();
 
-                    if (size > AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get()) {
-                        throw new IOException("Maximum file size exceeded (%sMB>%sMB)".formatted(Math.round((float) size / 1_000_000F), Math.round(AudioPlayerMod.SERVER_CONFIG.maxUploadSize.get().floatValue() / 1_000_000F)));
+                    if (size > AudioPlayer.SERVER_CONFIG.maxUploadSize.get()) {
+                        throw new IOException("Maximum file size exceeded (%sMB>%sMB)".formatted(Math.round((float) size / 1_000_000F), Math.round(AudioPlayer.SERVER_CONFIG.maxUploadSize.get().floatValue() / 1_000_000F)));
                     }
 
                     String filename = file.get("filename").getAsString();
@@ -88,12 +88,12 @@ public class Filebin {
                 throw new IOException("%s responded with status %s".formatted(url, response.statusCode()));
             }
         } catch (Exception e) {
-            AudioPlayerMod.LOGGER.warn("Failed to delete bin '{}'", url, e);
+            AudioPlayer.LOGGER.warn("Failed to delete bin '{}'", url, e);
         }
     }
 
     public static URI getBin(UUID sound) {
-        String filebinUrl = AudioPlayerMod.SERVER_CONFIG.filebinUrl.get();
+        String filebinUrl = AudioPlayer.SERVER_CONFIG.filebinUrl.get();
 
         if (!filebinUrl.endsWith("/")) {
             filebinUrl += "/";
