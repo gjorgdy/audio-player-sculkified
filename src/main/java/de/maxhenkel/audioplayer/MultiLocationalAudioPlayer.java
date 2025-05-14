@@ -1,29 +1,27 @@
 package de.maxhenkel.audioplayer;
 
 import de.maxhenkel.audioplayer.nodes.SpeakerNode;
-import de.maxhenkel.voicechat.api.ServerLevel;
-import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.function.Supplier;
 
 public class MultiLocationalAudioPlayer implements AudioPlayer {
 
     // static values
     public static final int SAMPLE_RATE = 48000;
+    public static final long FRAME_SIZE_NS = 20_000_000L;
     public static final int FRAME_SIZE = (SAMPLE_RATE / 1000) * 20;
     // input values
     private final short[] audioData;
     // maps of channel data
     private final ConcurrentHashMap<ServerPosition, SpeakerNode> speakers = new ConcurrentHashMap<>();
     // synced audio
-    private UUID controlPlayerID;
-    private int framePosition;
+    private int framePosition = 0;
     private Runnable onStopped;
+    private final ExecutorService playbackExecutor = Executors.newFixedThreadPool(1);
 
     public MultiLocationalAudioPlayer(List<SpeakerNode> speakers, short[] audioData) {
         this.audioData = audioData;
@@ -34,29 +32,27 @@ public class MultiLocationalAudioPlayer implements AudioPlayer {
     public void startPlaying() {
         speakers.values().forEach(speakerNode -> {
             // remove itself when stopped
-            speakerNode.setOnStopped(() -> {
-                speakers.remove(speakerNode.position);
-                setRandomController();
-            });
-            speakerNode.setAudioSupplier(
-                    new AudioSupplier(audioData, speakerNode.uuid)
-            );
+            speakerNode.setOnStopped(() -> speakers.remove(speakerNode.position));
+            speakerNode.setAudioSupplier(new AudioSupplier());
             // start playing on this channel
             speakerNode.startPlaying();
-            controlPlayerID = speakerNode.uuid;
         });
-        setRandomController();
-    }
-
-    private void setRandomController() {
-        if (speakers.isEmpty()) {
-            controlPlayerID = null;
-        } else controlPlayerID = speakers.values().stream().findFirst().get().uuid;
+        playbackExecutor.submit(() -> {
+            long next = System.nanoTime() + FRAME_SIZE_NS;
+            while (framePosition < audioData.length) {
+                framePosition += FRAME_SIZE;
+                next += FRAME_SIZE_NS;
+                while (System.nanoTime() < next) {
+                    Thread.onSpinWait();
+                }
+            }
+        });
     }
 
     @Override
     public void stopPlaying() {
         speakers.values().forEach(AudioPlayer::stopPlaying);
+        playbackExecutor.shutdownNow();
         if (onStopped != null) {
             onStopped.run();
         }
@@ -84,21 +80,18 @@ public class MultiLocationalAudioPlayer implements AudioPlayer {
 
     private class AudioSupplier implements Supplier<short[]> {
 
-        private final UUID speakerChannelID;
-        private final short[] audioData;
         private final short[] audioFrame = new short[FRAME_SIZE];
-
-        public AudioSupplier(short[] audioData, UUID speakerChannelID) {
-            this.speakerChannelID = speakerChannelID;
-            this.audioData = Arrays.copyOf(audioData, audioData.length);
-        }
+        private int localFramePosition = 0;
 
         @Override
         public short[] get() {
-            if (controlPlayerID == speakerChannelID) framePosition += audioFrame.length;
-            if (framePosition >= audioData.length) return null;
+            localFramePosition += FRAME_SIZE;
+            if ((localFramePosition + FRAME_SIZE) <= framePosition) {
+                localFramePosition = framePosition;
+            }
+            if (localFramePosition >= audioData.length) return null;
             Arrays.fill(audioFrame, (short) 0);
-            System.arraycopy(audioData, framePosition, audioFrame, 0, Math.min(audioFrame.length, audioData.length - framePosition));
+            System.arraycopy(audioData, localFramePosition, audioFrame, 0, Math.min(audioFrame.length, audioData.length - localFramePosition));
             return audioFrame;
         }
     }
