@@ -91,7 +91,6 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
             // get note blocks around it
         } else {
             speakerNodes = sourceNode.getSpeakers();
-            speakerNodes.forEach(speakerNode -> speakerNode.setSourceNode(sourceNode));
             playerID = AudioManager.playMultiple(level, speakerNodes, PlayerType.MUSIC_DISC, customSound, null);
             sourceNode.setPlayerID(playerID);
         }

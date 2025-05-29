@@ -82,7 +82,7 @@ public record ServerPosition(
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         return position.toString() + " in " + level.toString();
     }
 }

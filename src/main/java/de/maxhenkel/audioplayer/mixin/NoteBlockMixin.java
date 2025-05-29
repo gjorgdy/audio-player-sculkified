@@ -3,6 +3,7 @@ package de.maxhenkel.audioplayer.mixin;
 import de.maxhenkel.audioplayer.*;
 import de.maxhenkel.audioplayer.interfaces.ChannelHolder;
 import de.maxhenkel.audioplayer.interfaces.CustomSoundHolder;
+import de.maxhenkel.audioplayer.nodes.AudioNode;
 import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -13,10 +14,12 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.NoteBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.redstone.Orientation;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.UUID;
@@ -58,29 +61,26 @@ public class NoteBlockMixin extends Block {
         }
     }
 
-//    @Inject(method = "neighborChanged", at = @At("HEAD"))
-//    public void onNeighbourChanged(BlockState blockState, Level level, BlockPos blockPos, Block block, BlockPos blockPos2, boolean bl, CallbackInfo ci) {
-//        // try to get a speaker node
-//        ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, blockPos);
-//        AudioNode node = SpeakerManager.instance().getNode(serverPosition,  false);
-//        // if block above is a sculk sensor, but it doesn't have a node
-//        if ((level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
-//                || level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR))
-//                && node == null
-//        ) {
-//            node = SpeakerManager.instance().createNode(serverPosition);
-////            if (node != null) {
-////                node.scan();
-////            }
-//        }
-//        // if block above is not a sculk sensor, but there is a node
-//        else if (!level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
-//                && !level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR)
-//                && node != null
-//        ) {
-//            node.disconnect();
-//        }
-//    }
+    @Inject(method = "neighborChanged", at = @At("HEAD"))
+    public void onNeighbourChanged(BlockState blockState, Level level, BlockPos blockPos, Block block, Orientation orientation, boolean bl, CallbackInfo ci) {
+        // try to get a speaker node
+        ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, blockPos);
+        AudioNode node = SpeakerManager.instance().getNode(serverPosition,  false);
+        // if block above is a sculk sensor, but it doesn't have a node
+        if ((level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
+                || level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR))
+                && node == null
+        ) {
+            SpeakerManager.instance().getNode(serverPosition, true);
+        }
+        // if block above is not a sculk sensor, but there is a node
+        else if (!level.getBlockState(blockPos.above()).is(Blocks.SCULK_SENSOR)
+                && !level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR)
+                && node != null
+        ) {
+            node.disconnect();
+        }
+    }
 
     @Override
     protected void onPlace(@NotNull BlockState blockState, Level level, BlockPos blockPos, @NotNull BlockState blockState2, boolean bl) {

@@ -14,81 +14,68 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SpeakerManager {
 
-    private static final SpeakerManager INSTANCE = new SpeakerManager();
-    private final ConcurrentHashMap<ServerPosition, SpeakerNode> speakers = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ServerPosition, RepeaterNode> repeaters = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ServerPosition, SourceNode> sources = new ConcurrentHashMap<>();
+    private static @Nullable SpeakerManager INSTANCE = null;
+    private final ConcurrentHashMap<ServerPosition, AudioNode> nodes = new ConcurrentHashMap<>();
 
-    public static SpeakerManager instance() {
+    public synchronized static SpeakerManager instance() {
+        if (INSTANCE == null) {
+            INSTANCE = new SpeakerManager();
+        }
         return INSTANCE;
     }
 
-    private void addNode(AudioNode node) {
-        if (node instanceof SpeakerNode speaker) {
-            speakers.put(node.position, speaker);
-        } else if (node instanceof RepeaterNode repeater) {
-            repeaters.put(repeater.position, repeater);
-        } else if (node instanceof SourceNode source) {
-            sources.put(source.position, source);
-        }
-    }
-
     public void removeNode(AudioNode node) {
-        if (node instanceof SpeakerNode) {
-            speakers.remove(node.position);
-        } else if (node instanceof RepeaterNode) {
-            repeaters.remove(node.position);
-        } else if (node instanceof SourceNode) {
-            sources.remove(node.position);
-        }
+        nodes.remove(node.position);
     }
 
     @Nullable
     public AudioNode getNode(@Nullable ServerPosition position, boolean createIfNotExists) {
-        if (speakers.containsKey(position)) return speakers.get(position);
-        if (repeaters.containsKey(position)) return repeaters.get(position);
-        if (sources.containsKey(position)) return sources.get(position);
-        if (createIfNotExists) return createNode(position);
-        return null;
+        AudioNode node = nodes.get(position);
+        if (node == null && createIfNotExists) {
+            node = createNode(position);
+            if (node != null) {
+                nodes.put(node.position, node);
+                node.scanAndConnect();
+            }
+        }
+        return node;
     }
 
     @Nullable
     private AudioNode createNode(@Nullable ServerPosition position) {
-        if (speakers.containsKey(position) || repeaters.containsKey(position) || sources.containsKey(position)) return null;
-        AudioNode node = null;
-        if (position == null) return null;
+        if (position == null || nodes.containsKey(position)) return null;
         // ignore auto-closable, it will shut down the server
         ServerLevel level = position.fabricLevel();
         if (level == null) return null;
         BlockPos pos = position.fabricBlockPos();
-        if (level.getBlockState(pos).is(Blocks.NOTE_BLOCK)) {
-            if (level.getBlockState(pos.above()).is(Blocks.SCULK_SENSOR)) {
-                node = new SpeakerNode(position, false);
-            } else if (level.getBlockState(pos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR)) {
-                node = new SpeakerNode(position, true);
-            }
-        } else if (level.getBlockState(pos).is(Blocks.AMETHYST_BLOCK)
-                && (level.getBlockState(pos.above()).is(Blocks.SCULK_SENSOR)
-                || level.getBlockState(pos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR))
-        ) {
-            node = new RepeaterNode(position);
-        } else if (level.getBlockState(pos).is(Blocks.JUKEBOX)
-                && (level.getBlockState(pos.above()).is(Blocks.SCULK_SHRIEKER))
-        ) {
-            node = new SourceNode(position);
+        BlockPos posAbove = pos.above();
+        // checks
+        boolean isNoteBlock = level.getBlockState(pos).is(Blocks.NOTE_BLOCK);
+        boolean isJukebox = level.getBlockState(pos).is(Blocks.JUKEBOX);
+        boolean isAmethystBlock = level.getBlockState(pos).is(Blocks.AMETHYST_BLOCK);
+        boolean hasSculkSensor = level.getBlockState(posAbove).is(Blocks.SCULK_SENSOR);
+        boolean hasSculkShrieker = level.getBlockState(posAbove).is(Blocks.SCULK_SHRIEKER);
+        boolean hasCalibratedSculkSensor = level.getBlockState(posAbove).is(Blocks.CALIBRATED_SCULK_SENSOR);
+        // early return
+        if (!isNoteBlock && !isJukebox && !isAmethystBlock) return null;
+        // create nodes
+        if (isNoteBlock && hasSculkSensor) {
+            return new SpeakerNode(position, false);
         }
-        if (node != null) {
-            addNode(node);
-            node.scan();
-            return node;
+        if (isNoteBlock && hasCalibratedSculkSensor) {
+            return new SpeakerNode(position, true);
+        }
+        if (isAmethystBlock && (hasSculkSensor || hasCalibratedSculkSensor)) {
+            return new RepeaterNode(position);
+        }
+        if (isJukebox && hasSculkShrieker) {
+            return new SourceNode(position);
         }
         return null;
     }
 
     public void stopAll() {
-        sources.values().forEach(AudioNode::disconnect);
-        speakers.values().forEach(AudioNode::disconnect);
-        repeaters.values().forEach(AudioNode::disconnect);
+        nodes.values().forEach(AudioNode::disconnect);
     }
 
     public static void onServerStopped(MinecraftServer ignoredServer) {

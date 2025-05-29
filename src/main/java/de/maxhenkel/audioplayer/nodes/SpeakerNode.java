@@ -14,7 +14,6 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
 
     private LocationalAudioChannel currentChannel;
     private AudioPlayer internalAudioPlayer;
-    private SourceNode sourceNode;
 
     public SpeakerNode(ServerPosition position, boolean canTransmit) {
         super(position, true, canTransmit);
@@ -34,14 +33,9 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
         }
     }
 
-    public synchronized void setSourceNode(SourceNode sourceNode) {
-        this.sourceNode = sourceNode;
-    }
-
     public synchronized void checkSourceConnection() {
-        if (!findSources().contains(sourceNode)) {
+        if (getSource() == null) {
             stopPlaying();
-            sourceNode = null;
         }
     }
 
