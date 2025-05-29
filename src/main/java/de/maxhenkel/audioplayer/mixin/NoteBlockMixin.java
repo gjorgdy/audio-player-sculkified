@@ -88,7 +88,7 @@ public class NoteBlockMixin extends Block {
                 || level.getBlockState(blockPos.above()).is(Blocks.CALIBRATED_SCULK_SENSOR))
         ) {
             ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, blockPos);
-            SpeakerManager.instance().createNode(serverPosition);
+            SpeakerManager.instance().getNode(serverPosition, true);
         }
         super.onPlace(blockState, level, blockPos, blockState2, bl);
     }

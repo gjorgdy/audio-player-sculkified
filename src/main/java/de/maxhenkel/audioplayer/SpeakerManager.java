@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SpeakerManager {
@@ -44,6 +45,11 @@ public class SpeakerManager {
     }
 
     @Nullable
+    public AudioNode getNode(@Nullable ServerPosition position) {
+        return getNode(position, false);
+    }
+
+    @Nullable
     public AudioNode getNode(@Nullable ServerPosition position, boolean createIfNotExists) {
         if (speakers.containsKey(position)) return speakers.get(position);
         if (repeaters.containsKey(position)) return repeaters.get(position);
@@ -53,10 +59,11 @@ public class SpeakerManager {
     }
 
     @Nullable
-    public AudioNode createNode(@Nullable ServerPosition position) {
+    private AudioNode createNode(@Nullable ServerPosition position) {
         if (speakers.containsKey(position) || repeaters.containsKey(position) || sources.containsKey(position)) return null;
         AudioNode node = null;
         if (position == null) return null;
+        // ignore auto-closable, it will shut down the server
         ServerLevel level = position.fabricLevel();
         if (level == null) return null;
         BlockPos pos = position.fabricBlockPos();

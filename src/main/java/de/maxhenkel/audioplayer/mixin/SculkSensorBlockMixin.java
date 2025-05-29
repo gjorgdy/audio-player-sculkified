@@ -31,7 +31,7 @@ public class SculkSensorBlockMixin extends Block {
                 || level.getBlockState(noteblockPos).is(Blocks.AMETHYST_BLOCK)
         ) {
             ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, noteblockPos);
-            SpeakerManager.instance().createNode(serverPosition);
+            SpeakerManager.instance().getNode(serverPosition, true);
         }
     }
 

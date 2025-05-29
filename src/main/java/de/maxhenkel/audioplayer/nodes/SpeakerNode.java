@@ -27,18 +27,18 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
         }
     }
 
-    public void setAudioSupplier(Supplier<short[]> audioSupplier) {
+    public synchronized void setAudioSupplier(Supplier<short[]> audioSupplier) {
         VoicechatServerApi api = Plugin.voicechatServerApi;
         if (api != null) {
             internalAudioPlayer = api.createAudioPlayer(currentChannel, api.createEncoder(), audioSupplier);
         }
     }
 
-    public void setSourceNode(SourceNode sourceNode) {
+    public synchronized void setSourceNode(SourceNode sourceNode) {
         this.sourceNode = sourceNode;
     }
 
-    public void checkSourceConnection() {
+    public synchronized void checkSourceConnection() {
         if (!findSources().contains(sourceNode)) {
             stopPlaying();
             sourceNode = null;
@@ -46,7 +46,7 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     }
 
     @Override
-    public void disconnect() {
+    public synchronized void disconnect() {
         // stop playing if playing anything
         stopPlaying();
         // disconnect from neighbouring nodes
@@ -54,34 +54,34 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     }
 
     @Override
-    public void startPlaying() {
+    public synchronized void startPlaying() {
         if (internalAudioPlayer != null)
             internalAudioPlayer.startPlaying();
     }
 
     @Override
-    public void stopPlaying() {
+    public synchronized void stopPlaying() {
         if (internalAudioPlayer != null)
             internalAudioPlayer.stopPlaying();
     }
 
     @Override
-    public boolean isStarted() {
+    public synchronized boolean isStarted() {
         return internalAudioPlayer != null && internalAudioPlayer.isStarted();
     }
 
     @Override
-    public boolean isPlaying() {
+    public synchronized boolean isPlaying() {
         return internalAudioPlayer != null && internalAudioPlayer.isPlaying();
     }
 
     @Override
-    public boolean isStopped() {
+    public synchronized boolean isStopped() {
         return internalAudioPlayer == null || internalAudioPlayer.isStopped();
     }
 
     @Override
-    public void setOnStopped(Runnable onStopped) {
+    public synchronized void setOnStopped(Runnable onStopped) {
         if (internalAudioPlayer != null)
             internalAudioPlayer.setOnStopped(onStopped);
     }

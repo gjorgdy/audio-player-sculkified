@@ -134,7 +134,8 @@ public abstract class AudioNode {
         if (speakers.size() >= MAX_SPEAKERS) return;
         // if self speaker
         if (this instanceof SpeakerNode speakerNode) {
-            if (!speakers.contains(speakerNode))
+            // If it is already connected to this graph or another, end search
+            if (!speakers.contains(speakerNode) && !speakerNode.isPlaying())
                 speakers.add(speakerNode);
             else return;
         }
@@ -148,6 +149,7 @@ public abstract class AudioNode {
     }
 
     private void triggerSensor(AudioNode transmitNode, AudioNode receiveNode) {
+        // ignore auto-closable, it will shut down the server
         ServerLevel level = transmitNode.position.fabricLevel();
         if (level == null) return;
         BlockPos transmitPos = transmitNode.position.fabricBlockPos();
