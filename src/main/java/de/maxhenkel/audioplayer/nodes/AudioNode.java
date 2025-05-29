@@ -61,30 +61,43 @@ public abstract class AudioNode {
         SpeakerManager.instance().removeNode(this);
     }
 
-    private boolean transmitTo(AudioNode node) {
-        if (this.canTransmit() && node.canReceive()) {
-            if (this.distanceTo(node) < this.distanceTo(receivingFrom)) {
-                receivingFrom = node;
+    private static boolean connect(AudioNode transmitNode, AudioNode receiveNode) {
+        if (transmitNode.canTransmit() && receiveNode.canReceive()) {
+            // if receiveNode already receives from transmitNode
+            if (receiveNode.receivingFrom == transmitNode) {
+                return false;
             }
-            if (!transmittingTo.contains(node)) {
-                transmittingTo.add(node);
-                return true;
+            // if receiveNode is in source chain of transmitNode (no circular sources)
+            AudioNode _node = transmitNode.receivingFrom;
+            while (!(_node instanceof SourceNode)) {
+                // transmitNode is in chain
+                if (_node == receiveNode) {
+                    return false;
+                }
+                // if node doesn't have a source yet
+                if (_node == null) {
+                    break;
+                }
+                _node = _node.receivingFrom;
             }
+            // if transmitNode is further than current source of receiveNode
+            if (receiveNode.distanceTo(transmitNode) > receiveNode.distanceTo(receiveNode.receivingFrom)) {
+                return false;
+            }
+            // connect
+            receiveNode.receivingFrom = transmitNode;
+            transmitNode.transmittingTo.add(receiveNode);
+            return true;
         }
         return false;
     }
 
+    private boolean transmitTo(AudioNode node) {
+        return connect(this, node);
+    }
+
     private boolean receiveFrom(AudioNode node) {
-        if (this.canReceive() && node.canTransmit()) {
-            if (!node.transmittingTo.contains(this)) {
-                node.transmittingTo.add(this);
-            }
-            if (this.distanceTo(node) < this.distanceTo(receivingFrom)) {
-                receivingFrom = node;
-                return true;
-            }
-        }
-        return false;
+        return connect(node, this);
     }
 
     public double distanceTo(AudioNode node) {
@@ -162,7 +175,10 @@ public abstract class AudioNode {
     }
 
     public void receiveParticles() {
-        triggerSensor(receivingFrom, this);
+        receiveParticles(receivingFrom);
+        if (receivingFrom instanceof RepeaterNode) {
+            receivingFrom.receiveParticles();
+        }
     }
 
     public void transmitParticles(AudioNode receiveNode) {
@@ -174,6 +190,7 @@ public abstract class AudioNode {
     }
 
     private static void triggerSensor(AudioNode transmitNode, AudioNode receiveNode) {
+        if (transmitNode == null || receiveNode == null) return;
         // ignore auto-closable, it will shut down the server
         ServerLevel level = transmitNode.position.fabricLevel();
         if (level == null) return;

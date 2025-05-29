@@ -241,6 +241,7 @@ public class PlayerManager {
     }
 
     public void stop(UUID channelID) {
+        if (channelID == null) return;
         PlayerReference player = players.get(channelID);
         if (player != null) {
             player.onStop.stop();
