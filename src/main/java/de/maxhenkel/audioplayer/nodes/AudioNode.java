@@ -67,16 +67,16 @@ public abstract class AudioNode {
             if (receiveNode.receivingFrom == transmitNode) {
                 return false;
             }
-            // if receiveNode is in source chain of transmitNode (no circular sources)
-            AudioNode _node = transmitNode.receivingFrom;
+            // check sources of transmitNode
+            AudioNode _node = transmitNode;
             while (!(_node instanceof SourceNode)) {
-                // transmitNode is in chain
+                // if receiveNode is in source chain of transmitNode (no circular sources)
                 if (_node == receiveNode) {
                     return false;
                 }
-                // if node doesn't have a source yet
+                // if transmitNode doesn't have a source (no floating nodes)
                 if (_node == null) {
-                    break;
+                    return false;
                 }
                 _node = _node.receivingFrom;
             }
