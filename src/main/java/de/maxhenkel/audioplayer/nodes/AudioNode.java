@@ -100,7 +100,7 @@ public abstract class AudioNode {
             AudioNode node = SpeakerManager.instance().getNode(offsetPosition, true);
             if (node != null && node != source) {
                 if (transmitTo(node)) {
-                    triggerSensor(this, node);
+                    triggerSensor(node);
                 }
                 if (receiveFrom(node)) {
                     node.scan(this, depth - 1);
@@ -144,19 +144,19 @@ public abstract class AudioNode {
         // repeat signal
         transmittingTo.forEach(node -> {
             node.getSpeakers(speakers, depth - 1);
-            triggerSensor(this, node);
+            triggerSensor(node);
         });
     }
 
-    private void triggerSensor(AudioNode transmitNode, AudioNode receiveNode) {
+    public void triggerSensor(AudioNode receiveNode) {
         // ignore auto-closable, it will shut down the server
-        ServerLevel level = transmitNode.position.fabricLevel();
+        ServerLevel level = this.position.fabricLevel();
         if (level == null) return;
-        BlockPos transmitPos = transmitNode.position.fabricBlockPos();
+        BlockPos transmitPos = this.position.fabricBlockPos();
         BlockPos receivePos = receiveNode.position.fabricBlockPos();
         level.sendParticles(new VibrationParticleOption(
-                        new BlockPositionSource(receiveNode.position.fabricBlockPos()), 20),
-                transmitPos.getX(), transmitPos.getY() + 1, transmitPos.getZ(), 1, 0.0, 0.0, 0.0, 0.0);
+                        new BlockPositionSource(receivePos.above()), 20),
+                transmitPos.getX() + 0.5, transmitPos.getY() + 1, transmitPos.getZ() + 0.5, 1, 0.0, 0.0, 0.0, 0.0);
 
         BlockState sensorBlockState = level.getBlockState(receivePos);
         if (sensorBlockState.is(Blocks.SCULK_SENSOR) || sensorBlockState.is(Blocks.CALIBRATED_SCULK_SENSOR)) {
