@@ -4,13 +4,12 @@ import de.maxhenkel.audioplayer.nodes.AudioNode;
 import de.maxhenkel.audioplayer.nodes.RepeaterNode;
 import de.maxhenkel.audioplayer.nodes.SourceNode;
 import de.maxhenkel.audioplayer.nodes.SpeakerNode;
-import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SpeakerManager {
@@ -42,11 +41,6 @@ public class SpeakerManager {
         } else if (node instanceof SourceNode) {
             sources.remove(node.position);
         }
-    }
-
-    @Nullable
-    public AudioNode getNode(@Nullable ServerPosition position) {
-        return getNode(position, false);
     }
 
     @Nullable
@@ -89,6 +83,16 @@ public class SpeakerManager {
             return node;
         }
         return null;
+    }
+
+    public void stopAll() {
+        sources.values().forEach(AudioNode::disconnect);
+        speakers.values().forEach(AudioNode::disconnect);
+        repeaters.values().forEach(AudioNode::disconnect);
+    }
+
+    public static void onServerStopped(MinecraftServer ignoredServer) {
+        instance().stopAll();
     }
 
 }

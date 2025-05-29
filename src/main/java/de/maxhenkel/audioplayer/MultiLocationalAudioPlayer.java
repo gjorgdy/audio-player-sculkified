@@ -22,6 +22,7 @@ public class MultiLocationalAudioPlayer implements AudioPlayer {
     private int framePosition = 0;
     private Runnable onStopped;
     private final ExecutorService playbackExecutor = Executors.newFixedThreadPool(1);
+    private boolean killSupplier = false;
 
     public MultiLocationalAudioPlayer(List<SpeakerNode> speakers, short[] audioData) {
         this.audioData = audioData;
@@ -39,7 +40,7 @@ public class MultiLocationalAudioPlayer implements AudioPlayer {
         });
         playbackExecutor.submit(() -> {
             long next = System.nanoTime() + FRAME_SIZE_NS;
-            while (framePosition < audioData.length) {
+            while (framePosition < audioData.length && !isStopped()) {
                 framePosition += FRAME_SIZE;
                 next += FRAME_SIZE_NS;
                 while (System.nanoTime() < next) {
@@ -51,6 +52,7 @@ public class MultiLocationalAudioPlayer implements AudioPlayer {
 
     @Override
     public void stopPlaying() {
+        killSupplier = true;
         speakers.values().forEach(AudioPlayer::stopPlaying);
         playbackExecutor.shutdownNow();
         if (onStopped != null) {
@@ -89,7 +91,7 @@ public class MultiLocationalAudioPlayer implements AudioPlayer {
             if ((localFramePosition + FRAME_SIZE) <= framePosition) {
                 localFramePosition = framePosition;
             }
-            if (localFramePosition >= audioData.length) return null;
+            if (localFramePosition >= audioData.length || killSupplier) return null;
             Arrays.fill(audioFrame, (short) 0);
             System.arraycopy(audioData, localFramePosition, audioFrame, 0, Math.min(audioFrame.length, audioData.length - localFramePosition));
             return audioFrame;

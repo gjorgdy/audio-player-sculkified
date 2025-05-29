@@ -65,5 +65,7 @@ public class AudioPlayer implements ModInitializer {
 
         ServerLifecycleEvents.SERVER_STARTED.register(WebServerEvents::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(WebServerEvents::onServerStopped);
+
+        ServerLifecycleEvents.SERVER_STOPPING.register(SpeakerManager::onServerStopped);
     }
 }
