@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(targets = "net/minecraft/world/level/block/entity/SculkSensorBlockEntity$VibrationUser")
-public class SculkSensorBlockEntityMixin {
+class SculkSensorBlockEntityMixin {
 
     @Final
     @Shadow
@@ -32,21 +32,21 @@ public class SculkSensorBlockEntityMixin {
 
     @Unique
     private boolean isResonateEvent(Holder<GameEvent> holder) {
-        return holder.is(GameEvent.RESONATE_1)
-                || holder.is(GameEvent.RESONATE_2)
-                || holder.is(GameEvent.RESONATE_3)
-                || holder.is(GameEvent.RESONATE_4)
-                || holder.is(GameEvent.RESONATE_5)
-                || holder.is(GameEvent.RESONATE_6)
-                || holder.is(GameEvent.RESONATE_7)
-                || holder.is(GameEvent.RESONATE_8)
-                || holder.is(GameEvent.RESONATE_9)
-                || holder.is(GameEvent.RESONATE_10)
-                || holder.is(GameEvent.RESONATE_11)
-                || holder.is(GameEvent.RESONATE_12)
-                || holder.is(GameEvent.RESONATE_13)
-                || holder.is(GameEvent.RESONATE_14)
-                || holder.is(GameEvent.RESONATE_15);
+        return holder == GameEvent.RESONATE_1
+                || holder == GameEvent.RESONATE_2
+                || holder == GameEvent.RESONATE_3
+                || holder == GameEvent.RESONATE_4
+                || holder == GameEvent.RESONATE_5
+                || holder == GameEvent.RESONATE_6
+                || holder == GameEvent.RESONATE_7
+                || holder == GameEvent.RESONATE_8
+                || holder == GameEvent.RESONATE_9
+                || holder == GameEvent.RESONATE_10
+                || holder == GameEvent.RESONATE_11
+                || holder == GameEvent.RESONATE_12
+                || holder == GameEvent.RESONATE_13
+                || holder == GameEvent.RESONATE_14
+                || holder == GameEvent.RESONATE_15;
     }
 
 }
