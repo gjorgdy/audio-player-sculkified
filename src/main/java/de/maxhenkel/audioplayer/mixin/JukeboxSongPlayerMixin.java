@@ -151,7 +151,7 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
                 // notes on speakers
                 speakerNodes.forEach(speakerNode -> {
                     if (speakerNode.isPlaying()) {
-                        sourceNode.triggerSensor(speakerNode);
+                        speakerNode.receiveParticles();
                         spawnMusicParticles(levelAccessor, speakerNode.position.fabricBlockPos().above());
                     }
                 });

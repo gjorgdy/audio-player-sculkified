@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.SculkSensorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SculkSensorPhase;
 import net.minecraft.world.level.gameevent.BlockPositionSource;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,17 +25,18 @@ public abstract class AudioNode {
     // settings
     public final ServerPosition position;
     // state
-    protected final List<AudioNode> receivingFrom;
+    private final boolean canReceive;
+    protected AudioNode receivingFrom;
     protected final List<AudioNode> transmittingTo;
 
     public AudioNode(ServerPosition position, boolean canReceive, boolean canTransmit) {
         this.position = position;
-        receivingFrom = canReceive ? new ArrayList<>() : null;
+        this.canReceive = canReceive;
         transmittingTo = canTransmit ? new ArrayList<>() : null;
     }
 
     public boolean canReceive() {
-        return receivingFrom != null;
+        return canReceive;
     }
 
     public boolean canTransmit() {
@@ -45,22 +47,24 @@ public abstract class AudioNode {
      * Remove itself from all connected nodes
      */
     public void disconnect() {
-        if (receivingFrom != null)
-            receivingFrom.forEach(transmittingNode -> transmittingNode.transmittingTo.remove(this));
+        if (receivingFrom != null && receivingFrom.transmittingTo != null)
+            receivingFrom.transmittingTo.remove(this);
         if (transmittingTo != null)
             transmittingTo.forEach(receivingNode -> {
                 if (receivingNode instanceof SpeakerNode speakerNode) {
                     speakerNode.checkSourceConnection();
                 }
-                receivingNode.receivingFrom.remove(this);
+                if (receivingNode.receivingFrom == this) {
+                    receivingNode.receivingFrom = null;
+                }
             });
         SpeakerManager.instance().removeNode(this);
     }
 
     private boolean transmitTo(AudioNode node) {
         if (this.canTransmit() && node.canReceive()) {
-            if (!node.receivingFrom.contains(this)) {
-                node.receivingFrom.add(this);
+            if (this.distanceTo(node) < this.distanceTo(receivingFrom)) {
+                receivingFrom = node;
             }
             if (!transmittingTo.contains(node)) {
                 transmittingTo.add(node);
@@ -75,12 +79,23 @@ public abstract class AudioNode {
             if (!node.transmittingTo.contains(this)) {
                 node.transmittingTo.add(this);
             }
-            if (!receivingFrom.contains(node)) {
-                receivingFrom.add(node);
+            if (this.distanceTo(node) < this.distanceTo(receivingFrom)) {
+                receivingFrom = node;
                 return true;
             }
         }
         return false;
+    }
+
+    public double distanceTo(AudioNode node) {
+        if (node == null) return Double.MAX_VALUE;
+        Vec3 thisPos = this.position.vec3();
+        Vec3 nodePos = node.position.vec3();
+        return Math.sqrt(
+            Math.pow(thisPos.x - nodePos.x, 2) +
+            Math.pow(thisPos.y - nodePos.y, 2) +
+            Math.pow(thisPos.z - nodePos.z, 2)
+        );
     }
 
     public void scan() {
@@ -100,7 +115,7 @@ public abstract class AudioNode {
             AudioNode node = SpeakerManager.instance().getNode(offsetPosition, true);
             if (node != null && node != source) {
                 if (transmitTo(node)) {
-                    triggerSensor(node);
+                    transmitParticles(node);
                 }
                 if (receiveFrom(node)) {
                     node.scan(this, depth - 1);
@@ -118,9 +133,7 @@ public abstract class AudioNode {
         if (receivingFrom == null) return new ArrayList<>();
         List<AudioNode> sources = new ArrayList<>();
         if (depth == 0) return sources;
-        for (AudioNode node : receivingFrom) {
-            sources.addAll(node.findSources(depth - 1));
-        }
+        sources.addAll(receivingFrom.findSources(depth - 1));
         return sources;
     }
 
@@ -144,15 +157,27 @@ public abstract class AudioNode {
         // repeat signal
         transmittingTo.forEach(node -> {
             node.getSpeakers(speakers, depth - 1);
-            triggerSensor(node);
+            transmitParticles(node);
         });
     }
 
-    public void triggerSensor(AudioNode receiveNode) {
+    public void receiveParticles() {
+        triggerSensor(receivingFrom, this);
+    }
+
+    public void transmitParticles(AudioNode receiveNode) {
+        triggerSensor(this, receiveNode);
+    }
+
+    public void receiveParticles(AudioNode transmitNode) {
+        triggerSensor(transmitNode, this);
+    }
+
+    private static void triggerSensor(AudioNode transmitNode, AudioNode receiveNode) {
         // ignore auto-closable, it will shut down the server
-        ServerLevel level = this.position.fabricLevel();
+        ServerLevel level = transmitNode.position.fabricLevel();
         if (level == null) return;
-        BlockPos transmitPos = this.position.fabricBlockPos();
+        BlockPos transmitPos = transmitNode.position.fabricBlockPos();
         BlockPos receivePos = receiveNode.position.fabricBlockPos();
         level.sendParticles(new VibrationParticleOption(
                         new BlockPositionSource(receivePos.above()), 20),
