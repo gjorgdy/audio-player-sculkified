@@ -34,7 +34,8 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     }
 
     public synchronized void checkSourceConnection() {
-        if (getSource() == null) {
+        if (getInitialSource() == null) {
+            sourcePos = null;
             stopPlaying();
         }
     }

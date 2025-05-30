@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 public abstract class AudioNode {
 
@@ -28,59 +29,87 @@ public abstract class AudioNode {
     public final ServerPosition position;
     // state
     private final boolean canReceive;
-    protected AudioNode receivingFrom;
-    protected final List<AudioNode> transmittingTo;
+    private final boolean canTransmit;
+    public ServerPosition sourcePos;
 
     public AudioNode(ServerPosition position, boolean canReceive, boolean canTransmit) {
         this.position = position;
         this.canReceive = canReceive;
-        transmittingTo = canTransmit ? new ArrayList<>() : null;
+        this.canTransmit = canTransmit;
     }
 
     public boolean canReceive() {
         return canReceive;
     }
 
+    @Nullable
+    public AudioNode getSource() {
+        return sourcePos != null
+            ? SpeakerManager.instance().getNode(sourcePos)
+            : null;
+    }
+
+    @Nullable
+    public SourceNode getInitialSource() {
+        return getInitialSource(MAX_DEPTH);
+    }
+
+    @Nullable
+    protected SourceNode getInitialSource(int depth) {
+        var _source = getSource();
+        if (depth == 0 || _source == null) return null;
+        return _source instanceof SourceNode sourceNode
+                ? sourceNode
+                : _source.getInitialSource(depth - 1);
+    }
+
     public boolean canTransmit() {
-        return transmittingTo != null;
+        return canTransmit;
+    }
+
+    public Stream<AudioNode> getReceivers() {
+        return SpeakerManager.instance().getReceivingNodes(this);
     }
 
     /**
      * Remove itself from all connected nodes
      */
     public void disconnect() {
-        // remove its source
-        if (receivingFrom != null) {
-            receivingFrom.disconnectFrom(this);
-            receivingFrom = null;
-        }
-        // remove its receivers
-        if (transmittingTo != null) {
-            for (AudioNode audioNode : transmittingTo) {
-                audioNode.disconnectFrom(this);
-            }
-            transmittingTo.clear();
-        }
         // remove itself from manager
         SpeakerManager.instance().removeNode(this);
+        // remove its source
+        var _receivingFrom = getSource();
+        if (_receivingFrom != null) {
+            _receivingFrom.disconnectFrom(this);
+            sourcePos = null;
+        }
+        // remove its receivers
+        if (canTransmit) {
+            getReceivers().forEach(receiver -> receiver.disconnectFrom(this));
+        }
     }
 
     private void disconnectFrom(@NotNull AudioNode node) {
-        if (node.receivingFrom == this) {
-            node.receivingFrom = null;
+        if (node.getSource() == this) {
+            node.sourcePos = null;
         }
-        if (this.transmittingTo != null) {
-            this.transmittingTo.remove(node);
-        }
-        propagateDisconnect();
+        // try and re-establish a connection
+        scanAndConnect();
+        // communicate the disconnect to receivers
+        propagateDisconnect(node);
     }
 
-    protected void propagateDisconnect() {
+    protected void propagateDisconnect(AudioNode caller) {
+        if (this == caller) {
+            return;
+        }
         if (this instanceof SpeakerNode speakerNode) {
             speakerNode.checkSourceConnection();
         }
-        if (transmittingTo != null) {
-            transmittingTo.forEach(AudioNode::propagateDisconnect);
+        if (canTransmit) {
+            getReceivers().forEach(
+                node -> node.propagateDisconnect(caller)
+            );
         }
     }
 
@@ -88,11 +117,11 @@ public abstract class AudioNode {
         if (transmitNode == receiveNode) return false;
         if (transmitNode.canTransmit() && receiveNode.canReceive()) {
             // if receiveNode already receives from transmitNode
-            if (receiveNode.receivingFrom == transmitNode) {
+            if (receiveNode.getSource() == transmitNode) {
                 return false;
             }
             // if transmitNode is further than current source of receiveNode
-            if (receiveNode.distanceTo(transmitNode) > receiveNode.distanceTo(receiveNode.receivingFrom)) {
+            if (receiveNode.distanceTo(transmitNode) > receiveNode.distanceTo(receiveNode.getSource())) {
                 return false;
             }
             // check sources of transmitNode
@@ -104,9 +133,10 @@ public abstract class AudioNode {
                 }
                 // if transmitNode doesn't have a source (no floating nodes)
                 if (_node == null) {
+                    transmitNode.sourcePos = null;
                     return false;
                 }
-                _node = _node.receivingFrom;
+                _node = _node.getSource();
             }
             // connect
             connect(transmitNode, receiveNode);
@@ -116,8 +146,8 @@ public abstract class AudioNode {
     }
 
     private static void connect(AudioNode transmitNode, AudioNode receiveNode) {
-        receiveNode.receivingFrom = transmitNode;
-        transmitNode.transmittingTo.add(receiveNode);
+        receiveNode.sourcePos = transmitNode.position;
+//        transmitNode.receiversPos.add(receiveNode.position);
     }
 
     public double distanceTo(AudioNode node) {
@@ -149,19 +179,6 @@ public abstract class AudioNode {
         }, TRANSMIT_RADIUS);
     }
 
-    @Nullable
-    public SourceNode getSource() {
-        return getSource(MAX_DEPTH);
-    }
-
-    @Nullable
-    protected SourceNode getSource(int depth) {
-        if (depth == 0 || receivingFrom == null) return null;
-        return receivingFrom instanceof SourceNode sourceNode
-            ? sourceNode
-            : receivingFrom.getSource(depth - 1);
-    }
-
     public List<SpeakerNode> getSpeakers() {
         List<SpeakerNode> speakers = new ArrayList<>();
         getSpeakers(speakers, MAX_DEPTH);
@@ -178,18 +195,19 @@ public abstract class AudioNode {
             else return;
         }
         // if reached max range, or can't transmit
-        if (depth == 0 || transmittingTo == null) return;
+        if (depth == 0 || !canTransmit) return;
         // repeat signal
-        transmittingTo.forEach(node -> {
+        getReceivers().forEach(node -> {
             node.getSpeakers(speakers, depth - 1);
             transmitParticles(node);
         });
     }
 
     public void receiveParticles() {
-        receiveParticles(receivingFrom);
-        if (receivingFrom instanceof RepeaterNode) {
-            receivingFrom.receiveParticles();
+        var _source = getSource();
+        receiveParticles(_source);
+        if (_source instanceof RepeaterNode) {
+            _source.receiveParticles();
         }
     }
 

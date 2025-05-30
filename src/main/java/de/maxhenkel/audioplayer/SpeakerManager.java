@@ -7,10 +7,12 @@ import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
 
 import javax.annotation.Nullable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 public class SpeakerManager {
 
@@ -24,8 +26,22 @@ public class SpeakerManager {
         return INSTANCE;
     }
 
+    public void disconnectNode(LevelAccessor level, BlockPos pos) {
+        ServerPosition serverPosition = ServerPosition.create((ServerLevel) level, pos);
+        AudioNode node = getNode(serverPosition);
+        if (node != null) {
+            node.disconnect();
+        }
+    }
+
+
     public void removeNode(AudioNode node) {
         nodes.remove(node.position);
+    }
+
+    @Nullable
+    public AudioNode getNode(@Nullable ServerPosition position) {
+        return nodes.get(position);
     }
 
     @Nullable
@@ -39,6 +55,13 @@ public class SpeakerManager {
             }
         }
         return node;
+    }
+
+    public Stream<AudioNode> getReceivingNodes(AudioNode source) {
+        return nodes
+                .values()
+                .stream()
+                .filter(node -> node.sourcePos == source.position);
     }
 
     @Nullable

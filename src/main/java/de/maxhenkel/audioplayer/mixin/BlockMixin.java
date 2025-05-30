@@ -1,13 +1,16 @@
 package de.maxhenkel.audioplayer.mixin;
 
 import de.maxhenkel.audioplayer.CustomSound;
+import de.maxhenkel.audioplayer.SpeakerManager;
 import de.maxhenkel.audioplayer.interfaces.CustomSoundHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -16,6 +19,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
@@ -56,6 +60,16 @@ public class BlockMixin {
                 continue;
             }
             customSound.saveToItem(stack);
+        }
+    }
+
+    @Inject(method = "destroy", at = @At("RETURN"))
+    public void onDestroy(LevelAccessor levelAccessor, BlockPos blockPos, BlockState blockState, CallbackInfo ci) {
+        if (blockState.is(Blocks.AMETHYST_BLOCK) || blockState.is(Blocks.NOTE_BLOCK) || blockState.is(Blocks.JUKEBOX)) {
+            var _blockStateAbove = levelAccessor.getBlockState(blockPos.above());
+            if (_blockStateAbove.is(Blocks.SCULK_SENSOR) || _blockStateAbove.is(Blocks.CALIBRATED_SCULK_SENSOR) || _blockStateAbove.is(Blocks.SCULK_SHRIEKER)) {
+                SpeakerManager.instance().disconnectNode(levelAccessor, blockPos);
+            }
         }
     }
 

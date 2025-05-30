@@ -4,7 +4,6 @@ import de.maxhenkel.audioplayer.*;
 import de.maxhenkel.audioplayer.interfaces.ChannelHolder;
 import de.maxhenkel.audioplayer.interfaces.CustomSoundHolder;
 import de.maxhenkel.audioplayer.nodes.AudioNode;
-import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -95,10 +94,10 @@ public class NoteBlockMixin extends Block {
 
     @Override
     public void destroy(@NotNull LevelAccessor levelAccessor, @NotNull BlockPos blockPos, @NotNull BlockState blockState) {
-        ServerPosition serverPosition = ServerPosition.create((ServerLevel) levelAccessor, blockPos);
-        if (SpeakerManager.instance().getNode(serverPosition, false) instanceof SpeakerNode speakerNode) {
-            speakerNode.disconnect();
-        }
+//        ServerPosition serverPosition = ServerPosition.create((ServerLevel) levelAccessor, blockPos);
+//        if (SpeakerManager.instance().getNode(serverPosition, false) instanceof SpeakerNode speakerNode) {
+//            speakerNode.disconnect();
+//        }
         BlockEntity blockEntity = levelAccessor.getBlockEntity(blockPos.above());
         if (blockEntity instanceof ChannelHolder channelHolder) {
             UUID channelID = channelHolder.audioplayer$getChannelID();
