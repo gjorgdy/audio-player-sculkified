@@ -9,6 +9,7 @@
     "InstrumentItemMixin",
     "JukeboxBlockEntityMixin",
     "JukeboxSongPlayerMixin",
+    "MusicDiscMixin",
     "NoteBlockMixin",
     "SculkSensorBlockEntityMixin",
     "SculkSensorBlockMixin",
