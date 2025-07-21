@@ -9,7 +9,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ShriekParticleOption;
 import net.minecraft.core.UUIDUtil;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.JukeboxSong;
@@ -17,6 +16,8 @@ import net.minecraft.world.item.JukeboxSongPlayer;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -162,15 +163,15 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
     }
 
     @Override
-    public void audioplayer$onSave(ItemStack item, CompoundTag compound, HolderLookup.Provider provider) {
+    public void audioplayer$onSave(ItemStack item, ValueOutput valueOutput) {
         if (playerID != null && !item.isEmpty()) {
-            compound.store("ChannelID", UUIDUtil.CODEC, playerID);
+            valueOutput.store("ChannelID", UUIDUtil.CODEC, playerID);
         }
     }
 
     @Override
-    public void audioplayer$onLoad(ItemStack item, CompoundTag compound, HolderLookup.Provider provider) {
-        UUID id = compound.read("ChannelID", UUIDUtil.CODEC).orElse(null);
+    public void audioplayer$onLoad(ItemStack item, ValueInput valueInput) {
+        UUID id = valueInput.read("ChannelID", UUIDUtil.CODEC).orElse(null);
         if (id != null && !item.isEmpty()) {
             playerID = id;
             song = null;
