@@ -16,6 +16,7 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     private AudioPlayer internalAudioPlayer;
 
     private Supplier<Boolean> isPlaying;
+    private Runnable onStopped;
 
     public SpeakerNode(ServerPosition position, boolean canTransmit) {
         super(position, true, canTransmit);
@@ -58,8 +59,7 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
 
     @Override
     public synchronized void stopPlaying() {
-        if (internalAudioPlayer != null)
-            internalAudioPlayer.stopPlaying();
+        onStopped.run();
     }
 
     @Override
@@ -79,8 +79,7 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
 
     @Override
     public synchronized void setOnStopped(Runnable onStopped) {
-        if (internalAudioPlayer != null)
-            internalAudioPlayer.setOnStopped(onStopped);
+        this.onStopped = onStopped;
     }
 
     public synchronized void setIsPlaying(Supplier<Boolean> isPlaying) {
