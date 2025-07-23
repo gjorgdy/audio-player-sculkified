@@ -76,6 +76,7 @@ public class MultiLocationalAudioChannel implements LocationalAudioChannel {
     @Override
     public void flush() {
         channels.forEach(AudioChannel::flush);
+        channels.clear();
     }
 
     @Override
