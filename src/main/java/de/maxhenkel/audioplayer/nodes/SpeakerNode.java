@@ -15,6 +15,8 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     private LocationalAudioChannel currentChannel;
     private AudioPlayer internalAudioPlayer;
 
+    private Supplier<Boolean> isPlaying;
+
     public SpeakerNode(ServerPosition position, boolean canTransmit) {
         super(position, true, canTransmit);
         this.uuid = UUID.randomUUID();
@@ -62,12 +64,12 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
 
     @Override
     public synchronized boolean isStarted() {
-        return internalAudioPlayer != null && internalAudioPlayer.isStarted();
+        return isPlaying != null && isPlaying.get();
     }
 
     @Override
     public synchronized boolean isPlaying() {
-        return internalAudioPlayer != null && internalAudioPlayer.isPlaying();
+        return isPlaying != null && isPlaying.get();
     }
 
     @Override
@@ -79,6 +81,10 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     public synchronized void setOnStopped(Runnable onStopped) {
         if (internalAudioPlayer != null)
             internalAudioPlayer.setOnStopped(onStopped);
+    }
+
+    public synchronized void setIsPlaying(Supplier<Boolean> isPlaying) {
+        this.isPlaying = isPlaying;
     }
 
 }

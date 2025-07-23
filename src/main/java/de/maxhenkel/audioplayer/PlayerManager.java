@@ -4,7 +4,6 @@ import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import de.maxhenkel.voicechat.api.Player;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
-import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -78,6 +77,11 @@ public class PlayerManager {
         UUID channelID = UUID.randomUUID();
         LocationalAudioChannel channel = createLocationalAudioChannel(channelID, api, level, pos, category, distance);
 
+        return playChannel(api, level, sound, p, maxLengthSeconds, byCommand, channelID, channel);
+    }
+
+    @Nullable
+    private UUID playChannel(VoicechatServerApi api, ServerLevel level, UUID sound, @Nullable ServerPlayer p, int maxLengthSeconds, boolean byCommand, UUID channelID, LocationalAudioChannel channel) {
         AtomicBoolean stopped = new AtomicBoolean();
         AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> player = new AtomicReference<>();
 
@@ -92,11 +96,9 @@ public class PlayerManager {
         }, player, sound, byCommand));
 
         executor.execute(() -> {
-            de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = playChannel(api, channel, level, sound, p, maxLengthSeconds);
-            if (audioPlayer == null) {
-                players.remove(channelID);
-                return;
-            }
+            short[] audio = getSound(level.getServer(), p, sound, maxLengthSeconds);
+            if (audio == null) return;
+            var audioPlayer = api.createAudioPlayer(channel, api.createEncoder(), audio);
             audioPlayer.setOnStopped(() -> players.remove(channelID));
             synchronized (stopped) {
                 if (!stopped.get()) {
@@ -105,6 +107,7 @@ public class PlayerManager {
                     audioPlayer.stopPlaying();
                 }
             }
+            audioPlayer.startPlaying();
         });
         return channelID;
     }
@@ -118,35 +121,24 @@ public class PlayerManager {
     public UUID playMultipleLocational(VoicechatServerApi api, ServerLevel level, List<SpeakerNode> nodes, UUID sound, @Nullable ServerPlayer p, int maxLengthSeconds, boolean byCommand) {
         UUID channelID = UUID.randomUUID();
 
-        AtomicBoolean stopped = new AtomicBoolean();
-        AtomicReference<de.maxhenkel.voicechat.api.audiochannel.AudioPlayer> playerReference = new AtomicReference<>();
+        MultiLocationalAudioChannel mlChannel = new MultiLocationalAudioChannel( "speaker", 16f, channelID);
 
-        players.put(channelID, new PlayerReference(() -> {
-            synchronized (stopped) {
-                stopped.set(true);
-                de.maxhenkel.voicechat.api.audiochannel.AudioPlayer audioPlayer = playerReference.get();
-                if (audioPlayer != null) {
-                    audioPlayer.stopPlaying();
-                }
-            }
-        }, playerReference, sound, byCommand));
-
-        executor.execute(() -> {
-            MultiLocationalAudioPlayer audioPlayer = playChannels(api, channelID, nodes, level, sound, p, maxLengthSeconds);
-            if (audioPlayer == null) {
-                players.remove(channelID);
-                return;
-            }
-            audioPlayer.setOnStopped(() -> players.remove(channelID));
-            synchronized (stopped) {
-                if (!stopped.get()) {
-                    playerReference.set(audioPlayer);
-                } else {
-                    audioPlayer.stopPlaying();
-                }
-            }
+        nodes.forEach(node -> {
+            UUID _channelID = UUID.randomUUID();
+            var _channel = api.createLocationalAudioChannel(
+                    _channelID,
+                    api.fromServerLevel(level),
+                    api.createPosition(
+                            node.position.vec3().x,
+                            node.position.vec3().y,
+                            node.position.vec3().z
+                    ));
+            mlChannel.addChannel(_channel);
+            node.setIsPlaying(() -> mlChannel.hasChannel(_channel));
+            node.setOnStopped(() -> mlChannel.removeChannel(_channel));
         });
-        return channelID;
+
+        return playChannel(api, level, sound, p, maxLengthSeconds, byCommand, channelID, mlChannel);
     }
 
     @Nullable
@@ -196,26 +188,6 @@ public class PlayerManager {
             }
         });
         return channelID;
-    }
-
-    @Nullable
-    private MultiLocationalAudioPlayer playChannels(VoicechatServerApi api, UUID channelID, List<SpeakerNode> channels, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
-        short[] audio = getSound(level.getServer(), p, sound, maxLengthSeconds);
-        if (audio == null) return null;
-
-        MultiLocationalAudioPlayer player = new MultiLocationalAudioPlayer(channels, audio);
-        player.startPlaying();
-        return player;
-    }
-
-    @Nullable
-    private de.maxhenkel.voicechat.api.audiochannel.AudioPlayer playChannel(VoicechatServerApi api, AudioChannel channel, ServerLevel level, UUID sound, ServerPlayer p, int maxLengthSeconds) {
-        short[] audio = getSound(level.getServer(), p, sound, maxLengthSeconds);
-        if (audio == null) return null;
-
-        de.maxhenkel.voicechat.api.audiochannel.AudioPlayer player = api.createAudioPlayer(channel, api.createEncoder(), audio);
-        player.startPlaying();
-        return player;
     }
 
     private short @Nullable [] getSound(MinecraftServer server, ServerPlayer p, UUID soundId, int maxLengthSeconds) {
