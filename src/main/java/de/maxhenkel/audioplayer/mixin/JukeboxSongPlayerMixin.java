@@ -6,7 +6,6 @@ import de.maxhenkel.audioplayer.nodes.SourceNode;
 import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ShriekParticleOption;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
@@ -55,8 +54,6 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
     private boolean hasShrieker = false;
     @Unique
     private SourceNode sourceNode;
-    @Unique
-    private List<SpeakerNode> speakerNodes;
 
     @Shadow
     private static void spawnMusicParticles(LevelAccessor levelAccessor, BlockPos blockPos) {
@@ -91,9 +88,8 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
             playerID = jukeboxChannel;
             // get note blocks around it
         } else {
-            speakerNodes = sourceNode.getSpeakers();
-            playerID = AudioManager.playMultiple(level, speakerNodes, PlayerType.MUSIC_DISC, customSound, null);
-            sourceNode.setPlayerID(playerID);
+            playerID = AudioManager.playMultiple(level, sourceNode, sourceNode.getSpeakers(), PlayerType.MUSIC_DISC, customSound, null);
+            sourceNode.setId(playerID);
         }
         ticksSinceSongStarted = 0L;
         onSongChanged.notifyChange();
@@ -107,7 +103,7 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         }
         PlayerManager playerManager = PlayerManager.instance();
         playerManager.stop(playerID);
-        if (sourceNode != null) sourceNode.setPlayerID(null);
+        if (sourceNode != null) sourceNode.setId(null);
         playerID = null;
         song = null;
         ticksSinceSongStarted = 0L;
@@ -149,8 +145,14 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
                     );
                 }
                 // notes on speakers
-                speakerNodes.forEach(speakerNode -> {
-                    if (speakerNode.isPlaying()) {
+                sourceNode.channel.channels.forEach(channel -> {
+                    var node = SpeakerManager.instance().getNode(
+                        ServerPosition.create(
+                            sourceNode.position.level(),
+                            channel.getLocation()
+                        )
+                    );
+                    if (node instanceof SpeakerNode speakerNode && speakerNode.isPlaying()) {
                         speakerNode.receiveParticles();
                         spawnMusicParticles(levelAccessor, speakerNode.position.fabricBlockPos().above());
                     }

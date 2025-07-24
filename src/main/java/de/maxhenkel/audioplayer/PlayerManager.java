@@ -1,5 +1,6 @@
 package de.maxhenkel.audioplayer;
 
+import de.maxhenkel.audioplayer.nodes.SourceNode;
 import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import de.maxhenkel.voicechat.api.Player;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
@@ -113,32 +114,19 @@ public class PlayerManager {
     }
 
     @Nullable
-    public UUID playMultipleLocational(VoicechatServerApi api, ServerLevel level, List<SpeakerNode> audioNodes, UUID sound, @Nullable ServerPlayer p, int maxLengthSeconds) {
-        return playMultipleLocational(api, level, audioNodes, sound, p, maxLengthSeconds, false);
+    public UUID playMultiLocational(VoicechatServerApi api, ServerLevel level, SourceNode sourceNode, List<SpeakerNode> audioNodes, UUID sound, @Nullable ServerPlayer p, int maxLengthSeconds) {
+        return playMultiLocational(api, level, sourceNode, audioNodes, sound, p, maxLengthSeconds, false);
     }
 
     @Nullable
-    public UUID playMultipleLocational(VoicechatServerApi api, ServerLevel level, List<SpeakerNode> nodes, UUID sound, @Nullable ServerPlayer p, int maxLengthSeconds, boolean byCommand) {
-        UUID channelID = UUID.randomUUID();
-
-        MultiLocationalAudioChannel mlChannel = new MultiLocationalAudioChannel( "speaker", 16f, channelID);
-
+    public UUID playMultiLocational(VoicechatServerApi api, ServerLevel level, SourceNode sourceNode, List<SpeakerNode> nodes, UUID sound, @Nullable ServerPlayer p, int maxLengthSeconds, boolean byCommand) {
         nodes.forEach(node -> {
-            UUID _channelID = UUID.randomUUID();
-            var _channel = api.createLocationalAudioChannel(
-                    _channelID,
-                    api.fromServerLevel(level),
-                    api.createPosition(
-                            node.position.vec3().x,
-                            node.position.vec3().y,
-                            node.position.vec3().z
-                    ));
-            mlChannel.addChannel(_channel);
-            node.setIsPlaying(() -> mlChannel.hasChannel(_channel));
-            node.setOnStopped(() -> mlChannel.removeChannel(_channel));
+            sourceNode.channel.addChannel(node.channel);
+            node.setIsPlaying(() -> sourceNode.channel.hasChannel(node.channel));
+            node.setOnStopped(() -> sourceNode.channel.removeChannel(node.channel));
         });
 
-        return playChannel(api, level, sound, p, maxLengthSeconds, byCommand, channelID, mlChannel);
+        return playChannel(api, level, sound, p, maxLengthSeconds, byCommand, sourceNode.channel.getId(), sourceNode.channel);
     }
 
     @Nullable

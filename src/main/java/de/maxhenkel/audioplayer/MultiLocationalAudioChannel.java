@@ -7,7 +7,8 @@ import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import de.maxhenkel.voicechat.api.packets.MicrophonePacket;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -17,7 +18,7 @@ public class MultiLocationalAudioChannel implements LocationalAudioChannel {
     private float distance;
     private final UUID channelId;
 
-    private final List<LocationalAudioChannel> channels = new java.util.ArrayList<>();
+    public final Set<LocationalAudioChannel> channels = new HashSet<>();
 
     public MultiLocationalAudioChannel(String category, float distance, UUID channelId) {
         this.category = category;
@@ -27,6 +28,12 @@ public class MultiLocationalAudioChannel implements LocationalAudioChannel {
 
     public void addChannel(LocationalAudioChannel channel) {
         channels.add(channel);
+    }
+
+    public boolean addChannelIfNotEmpty(LocationalAudioChannel channel) {
+        if (channels.isEmpty()) return false;
+        channels.add(channel);
+        return true;
     }
 
     public void removeChannel(LocationalAudioChannel channel) {
@@ -44,7 +51,8 @@ public class MultiLocationalAudioChannel implements LocationalAudioChannel {
 
     @Override
     public Position getLocation() {
-        return channels.getFirst().getLocation();
+        var first = channels.stream().findFirst();
+        return first.map(LocationalAudioChannel::getLocation).orElse(null);
     }
 
     @Override

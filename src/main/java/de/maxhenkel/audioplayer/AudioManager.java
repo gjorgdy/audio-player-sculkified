@@ -1,5 +1,6 @@
 package de.maxhenkel.audioplayer;
 
+import de.maxhenkel.audioplayer.nodes.SourceNode;
 import de.maxhenkel.audioplayer.nodes.SpeakerNode;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import net.fabricmc.loader.api.FabricLoader;
@@ -156,7 +157,7 @@ public class AudioManager {
 
 
     @Nullable
-    public static UUID playMultiple(ServerLevel level, List<SpeakerNode> positions, PlayerType type, CustomSound sound, @Nullable Player player) {
+    public static UUID playMultiple(ServerLevel level, SourceNode sourceNode, List<SpeakerNode> speakerNodes, PlayerType type, CustomSound sound, @Nullable Player player) {
         float range = sound.getRange(type);
 
         VoicechatServerApi api = Plugin.voicechatServerApi;
@@ -164,10 +165,11 @@ public class AudioManager {
             return null;
         }
 
-        return PlayerManager.instance().playMultipleLocational(
+        return PlayerManager.instance().playMultiLocational(
                 api,
                 level,
-                positions,
+                sourceNode,
+                speakerNodes,
                 sound.getSoundId(),
                 (player instanceof ServerPlayer p) ? p : null,
                 type.getMaxDuration().get()

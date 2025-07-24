@@ -113,7 +113,7 @@ public abstract class AudioNode {
         }
     }
 
-    private static boolean tryToConnect(AudioNode transmitNode, AudioNode receiveNode) {
+    protected boolean tryToConnect(AudioNode transmitNode, AudioNode receiveNode) {
         if (transmitNode == receiveNode) return false;
         if (transmitNode.canTransmit() && receiveNode.canReceive()) {
             // if receiveNode already receives from transmitNode

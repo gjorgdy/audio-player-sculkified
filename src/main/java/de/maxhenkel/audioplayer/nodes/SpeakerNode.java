@@ -2,19 +2,15 @@ package de.maxhenkel.audioplayer.nodes;
 
 import de.maxhenkel.audioplayer.*;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
-import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 
 import java.util.UUID;
 import java.util.function.Supplier;
 
-public class SpeakerNode extends AudioNode implements AudioPlayer {
+public class SpeakerNode extends AudioNode {
 
     public final UUID uuid;
-
-    private LocationalAudioChannel currentChannel;
-    private AudioPlayer internalAudioPlayer;
-
+    public final LocationalAudioChannel channel;
     private Supplier<Boolean> isPlaying;
     private Runnable onStopped;
 
@@ -22,18 +18,11 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
         super(position, true, canTransmit);
         this.uuid = UUID.randomUUID();
         VoicechatServerApi api = Plugin.voicechatServerApi;
-        if (api != null) {
-            currentChannel = PlayerManager.createLocationalAudioChannel(
-                    uuid, api, position.fabricLevel(), position.vec3(), PlayerType.MUSIC_DISC.getCategory(), PlayerType.MUSIC_DISC.getDefaultRange().get()
-            );
-        }
-    }
-
-    public synchronized void setAudioSupplier(Supplier<short[]> audioSupplier) {
-        VoicechatServerApi api = Plugin.voicechatServerApi;
-        if (api != null) {
-            internalAudioPlayer = api.createAudioPlayer(currentChannel, api.createEncoder(), audioSupplier);
-        }
+        channel = (api != null)
+            ? PlayerManager.createLocationalAudioChannel(
+                uuid, api, position.fabricLevel(), position.vec3(), PlayerType.MUSIC_DISC.getCategory(), PlayerType.MUSIC_DISC.getDefaultRange().get()
+            )
+            : null;
     }
 
     public synchronized void checkSourceConnection() {
@@ -44,6 +33,20 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
     }
 
     @Override
+    protected boolean tryToConnect(AudioNode transmitNode, AudioNode receiveNode) {
+        boolean connected = super.tryToConnect(transmitNode, receiveNode);
+        if (connected) {
+            SourceNode sourceNode = getInitialSource();
+            // if the sourceNode is playing, connect the channel
+            if (sourceNode != null && sourceNode.channel.addChannelIfNotEmpty(this.channel)) {
+                this.setIsPlaying(() -> sourceNode.channel.hasChannel(this.channel));
+                this.setOnStopped(() -> sourceNode.channel.removeChannel(this.channel));
+            }
+        }
+        return connected;
+    }
+
+    @Override
     public synchronized void disconnect() {
         // stop playing if playing anything
         stopPlaying();
@@ -51,33 +54,15 @@ public class SpeakerNode extends AudioNode implements AudioPlayer {
         super.disconnect();
     }
 
-    @Override
-    public synchronized void startPlaying() {
-        if (internalAudioPlayer != null)
-            internalAudioPlayer.startPlaying();
-    }
-
-    @Override
     public synchronized void stopPlaying() {
+        if (onStopped == null) return;
         onStopped.run();
     }
 
-    @Override
-    public synchronized boolean isStarted() {
-        return isPlaying != null && isPlaying.get();
-    }
-
-    @Override
     public synchronized boolean isPlaying() {
         return isPlaying != null && isPlaying.get();
     }
 
-    @Override
-    public synchronized boolean isStopped() {
-        return internalAudioPlayer == null || internalAudioPlayer.isStopped();
-    }
-
-    @Override
     public synchronized void setOnStopped(Runnable onStopped) {
         this.onStopped = onStopped;
     }
