@@ -10,9 +10,6 @@
     "JukeboxBlockEntityMixin",
     "JukeboxSongPlayerMixin",
     "NoteBlockMixin",
-    "SculkSensorBlockEntityMixin",
-    "SculkSensorBlockMixin",
-    "SculkShriekerBlockEntityMixin",
     "SkullBlockEntityMixin"
   ],
   "injectors": {
