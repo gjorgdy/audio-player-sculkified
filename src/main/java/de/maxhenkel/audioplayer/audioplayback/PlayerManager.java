@@ -14,6 +14,7 @@ import de.maxhenkel.audioplayer.audioloader.AudioData;
 import de.maxhenkel.audioplayer.audioloader.AudioStorageManager;
 import de.maxhenkel.audioplayer.audioloader.cache.CachedAudio;
 import de.maxhenkel.audioplayer.lang.Lang;
+import de.maxhenkel.audioplayer.sculkradio.MultiLocationalAudioChannel;
 import de.maxhenkel.audioplayer.utils.ChatUtils;
 import de.maxhenkel.audioplayer.voicechat.VoicechatAudioPlayerPlugin;
 import de.maxhenkel.voicechat.api.Player;
@@ -49,9 +50,13 @@ public class PlayerManager {
             return thread;
         });
     }
-
     @Nullable
     public ChannelReference<?> playType(ServerLevel serverLevel, @Nullable ServerPlayer player, AudioData data, PlayerType type, Event<Consumer<PlayEvent>> playEvent, Event<Consumer<PostPlayEvent>> postPlayEvent, Vec3 pos) {
+        return playType(serverLevel, player, data, type, playEvent, postPlayEvent, pos, false);
+    }
+
+    @Nullable
+    public ChannelReference<?> playType(ServerLevel serverLevel, @Nullable ServerPlayer player, AudioData data, PlayerType type, Event<Consumer<PlayEvent>> playEvent, Event<Consumer<PostPlayEvent>> postPlayEvent, Vec3 pos, boolean multiLocational) {
         UUID soundIdToPlay = data.getSoundIdToPlay();
         if (soundIdToPlay == null) {
             return null;
@@ -66,7 +71,9 @@ public class PlayerManager {
         playEvent.invoker().accept(event);
         ChannelReference<?> channel = event.getOverrideChannel();
         if (channel == null) {
-            channel = PlayerManager.instance().playLocational(serverLevel, event.getPosition(), event.getSoundId(), player, event.getDistance(), event.getCategory(), maxDuration);
+            channel = multiLocational
+                    ? PlayerManager.instance().playMultiLocational(serverLevel, event.getPosition(), event.getSoundId(), player, event.getDistance(), event.getCategory(), maxDuration)
+                    : PlayerManager.instance().playLocational(serverLevel, event.getPosition(), event.getSoundId(), player, event.getDistance(), event.getCategory(), maxDuration);
         }
         if (channel != null) {
             postPlayEvent.invoker().accept(new PostPlayEventImpl(channel, data, event.getSoundId(), event.getCategory(), event.getPosition(), serverLevel, player, event.getDistance()));
@@ -86,6 +93,27 @@ public class PlayerManager {
         if (channel == null) {
             return null;
         }
+        if (category != null) {
+            channel.setCategory(category);
+        }
+        channel.setDistance(distance);
+        api.getPlayersInRange(api.fromServerLevel(level), channel.getLocation(), distance + 1F, serverPlayer -> {
+            VoicechatConnection connection = api.getConnectionOf(serverPlayer);
+            return !ChatUtils.isAbleToHearVoicechat(connection);
+        }).stream().map(Player::getPlayer).map(ServerPlayer.class::cast).forEach(ChatUtils::sendEnableVoicechatMessage);
+
+        return playChannel(channel, sound, p, maxLengthSeconds);
+    }
+
+    @Nullable
+    public ChannelReferenceImpl<LocationalAudioChannel> playMultiLocational(ServerLevel level, Vec3 pos, UUID sound, @Nullable ServerPlayer p, float distance, @Nullable String category, @Nullable Float maxLengthSeconds) {
+        VoicechatServerApi api = VoicechatAudioPlayerPlugin.voicechatServerApi;
+        if (api == null) {
+            return null;
+        }
+
+        UUID channelID = UUID.randomUUID();
+        LocationalAudioChannel channel = new MultiLocationalAudioChannel(channelID, api.createPosition(pos.x, pos.y, pos.z));
         if (category != null) {
             channel.setCategory(category);
         }

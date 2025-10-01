@@ -11,7 +11,10 @@ plugins {
 apply from: "https://raw.githubusercontent.com/henkelmax/mod-gradle-scripts/${mod_gradle_script_version}/mod.gradle"
 
 repositories {
-
+    maven {
+        name = "Local Maven"
+        url = uri('../local-maven')
+    }
 }
 
 java {
@@ -36,6 +39,8 @@ dependencies {
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
     modRuntimeOnly "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}:fabric-stub"
     modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_mod_version}"
+
+    include(modImplementation "nl.gjorgdy:SculkRadio:1.1.2")
 
     Set<String> voicechatModules = [
             'fabric-api-base',
@@ -70,6 +75,7 @@ artifacts {
 def webResourcesDir = layout.buildDirectory.dir("web-resources")
 
 processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(webResourcesDir)
     filesMatching('fabric.mod.json') {
         expand 'mod_version': mod_version,

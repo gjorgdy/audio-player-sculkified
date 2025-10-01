@@ -55,7 +55,7 @@ public abstract class JukeboxBlockEntityMixin extends BlockEntity {
         if (!(jukeboxSongPlayer instanceof CustomJukeboxSongPlayer customJukeboxSongPlayer)) {
             return;
         }
-        boolean custom = customJukeboxSongPlayer.audioplayer$customStop();
+        boolean custom = customJukeboxSongPlayer.audioplayer$customStop(levelAccessor);
         if (!custom) {
             instance.stop(levelAccessor, blockState);
         }

@@ -2,6 +2,7 @@ package de.maxhenkel.audioplayer.interfaces;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
@@ -15,7 +16,7 @@ public interface CustomJukeboxSongPlayer {
 
     boolean audioplayer$customPlay(ServerLevel level, ItemStack item);
 
-    boolean audioplayer$customStop();
+    boolean audioplayer$customStop(LevelAccessor level);
 
     UUID audioplayer$getPlayerUUID();
 

@@ -6,6 +6,7 @@ import de.maxhenkel.audioplayer.audioplayback.PlayerManager;
 import de.maxhenkel.audioplayer.audioplayback.PlayerType;
 import de.maxhenkel.audioplayer.audioloader.AudioData;
 import de.maxhenkel.audioplayer.interfaces.CustomJukeboxSongPlayer;
+import de.maxhenkel.audioplayer.sculkradio.MultiLocationalAudioChannel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.UUIDUtil;
@@ -17,6 +18,7 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import nl.gjorgdy.sculk_radio.SculkRadio;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import javax.annotation.Nullable;
-import java.util.UUID;
+import java.util.*;
 
 @Mixin(JukeboxSongPlayer.class)
 public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer {
@@ -56,9 +58,18 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         if (data == null) {
             return false;
         }
-        ChannelReference<?> channel = PlayerManager.instance().playType(level, null, data, PlayerType.MUSIC_DISC, AudioEvents.PLAY_MUSIC_DISC, AudioEvents.POST_PLAY_MUSIC_DISC, blockPos.getCenter());
-        if (channel == null) {
-            return false;
+        boolean isRadio = SculkRadio.API.isRadio(level, blockPos);
+        ChannelReference<?> channel = PlayerManager.instance().playType(level, null, data, PlayerType.MUSIC_DISC, AudioEvents.PLAY_MUSIC_DISC, AudioEvents.POST_PLAY_MUSIC_DISC, blockPos.getCenter(), isRadio);
+        if (channel == null) return false;
+        if (SculkRadio.API.isRadio(level, blockPos)) {
+            if (channel.getChannel() instanceof MultiLocationalAudioChannel mlChannel) {
+                SculkRadio.API.play(
+                        level,
+                        this.blockPos,
+                        n -> mlChannel.addChannel(n.getWorld(), n.getPos().getCenter()),
+                        n -> mlChannel.removeChannel(n.getPos().getCenter())
+                );
+            }
         }
         channelId = channel.getChannel().getId();
         song = null;
@@ -68,10 +79,12 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
     }
 
     @Override
-    public boolean audioplayer$customStop() {
+    public boolean audioplayer$customStop(LevelAccessor level) {
         if (channelId == null) {
             return false;
         }
+        if (level instanceof ServerLevel sl)
+            SculkRadio.API.stop(sl, this.blockPos);
         PlayerManager.instance().stop(channelId);
         channelId = null;
         song = null;
@@ -96,13 +109,16 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         ci.cancel();
         if (!isPlaying()) {
             if (channelId != null) {
-                audioplayer$customStop();
+                audioplayer$customStop(levelAccessor);
             }
             return;
         }
 
         if (shouldEmitJukeboxPlayingEvent()) {
-            spawnMusicParticles(levelAccessor, blockPos);
+            if (levelAccessor instanceof ServerLevel sw) {
+                boolean executed = SculkRadio.API.tick(sw, this.blockPos);
+                if (!executed) spawnMusicParticles(levelAccessor, blockPos);
+            }
         }
         ticksSinceSongStarted++;
     }
@@ -120,8 +136,6 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         if (id != null && !item.isEmpty()) {
             channelId = id;
             song = null;
-        } else {
-            channelId = null;
         }
     }
 
