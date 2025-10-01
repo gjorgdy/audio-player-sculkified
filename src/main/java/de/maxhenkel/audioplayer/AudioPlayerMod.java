@@ -6,12 +6,16 @@ import de.maxhenkel.audioplayer.audioloader.AudioStorageManager;
 import de.maxhenkel.audioplayer.command.*;
 import de.maxhenkel.audioplayer.config.ServerConfig;
 import de.maxhenkel.audioplayer.lang.Lang;
+import de.maxhenkel.audioplayer.listener.UseItemCallbackListener;
 import de.maxhenkel.audioplayer.permission.AudioPlayerPermissionManager;
 import de.maxhenkel.audioplayer.webserver.WebServerEvents;
 import de.maxhenkel.configbuilder.ConfigBuilder;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.world.item.ServerItemCooldowns;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,6 +31,8 @@ public class AudioPlayerMod implements ModInitializer {
     public void onInitialize() {
         SERVER_CONFIG = ConfigBuilder.builder(ServerConfig::new).path(getModConfigFolder().resolve("audioplayer-server.properties")).migration(ServerConfig::migrate).build();
         Lang.onInitialize();
+
+        UseItemCallback.EVENT.register(new UseItemCallbackListener());
 
         WebServerEvents.onInitialize();
         AudioStorageManager.onInitialize();
