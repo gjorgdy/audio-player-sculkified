@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.util.TriState;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.List;
 
@@ -44,6 +45,19 @@ public class AudioPlayerPermissionManager implements PermissionManager<CommandSo
                 return p.hasPermission(stack.getPlayer());
             }
             return stack.hasPermission(2);
+        }
+        return false;
+    }
+
+    public boolean hasPermission(ServerPlayer player, String permission) {
+        for (Permission p : PERMISSIONS) {
+            if (!p.permission.equals(permission)) {
+                continue;
+            }
+            if (!p.canUse()) {
+                return false;
+            }
+            return p.hasPermission(player);
         }
         return false;
     }
