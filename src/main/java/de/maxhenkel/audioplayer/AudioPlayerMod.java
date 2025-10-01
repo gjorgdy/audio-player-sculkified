@@ -1,72 +1,54 @@
 package de.maxhenkel.audioplayer;
 
 import de.maxhenkel.admiral.MinecraftAdmiral;
-import de.maxhenkel.audioplayer.command.ApplyCommands;
-import de.maxhenkel.audioplayer.command.PlayCommands;
-import de.maxhenkel.audioplayer.command.UploadCommands;
-import de.maxhenkel.audioplayer.command.UtilityCommands;
+import de.maxhenkel.audioplayer.api.AudioPlayerModule;
+import de.maxhenkel.audioplayer.audioloader.AudioStorageManager;
+import de.maxhenkel.audioplayer.command.*;
 import de.maxhenkel.audioplayer.config.ServerConfig;
-import de.maxhenkel.audioplayer.config.WebServerConfig;
+import de.maxhenkel.audioplayer.lang.Lang;
+import de.maxhenkel.audioplayer.permission.AudioPlayerPermissionManager;
 import de.maxhenkel.audioplayer.webserver.WebServerEvents;
 import de.maxhenkel.configbuilder.ConfigBuilder;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 public class AudioPlayerMod implements ModInitializer {
 
     public static final String MODID = "audioplayer";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
     public static ServerConfig SERVER_CONFIG;
-    public static WebServerConfig WEB_SERVER_CONFIG;
-
-    public static AudioCache AUDIO_CACHE;
-    public static ScheduledExecutorService SCHEDULED_EXECUTOR = Executors.newScheduledThreadPool(1, r -> {
-        Thread thread = new Thread(r, "AudioPlayerExecutor");
-        thread.setDaemon(true);
-        thread.setUncaughtExceptionHandler((t, e) -> AudioPlayerMod.LOGGER.error("Uncaught exception in thread {}", t.getName(), e));
-        return thread;
-    });
 
     @Override
     public void onInitialize() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
+        SERVER_CONFIG = ConfigBuilder.builder(ServerConfig::new).path(getModConfigFolder().resolve("audioplayer-server.properties")).migration(ServerConfig::migrate).build();
+        Lang.onInitialize();
+
+        WebServerEvents.onInitialize();
+        AudioStorageManager.onInitialize();
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             MinecraftAdmiral.builder(dispatcher, registryAccess).addCommandClasses(
-                UploadCommands.class,
-                ApplyCommands.class,
-                UtilityCommands.class,
-                PlayCommands.class
-            ).setPermissionManager(AudioPlayerPermissionManager.INSTANCE).build()
-        );
+                            UploadCommands.class,
+                            ApplyCommands.class,
+                            UtilityCommands.class,
+                            VolumeCommands.class,
+                            PlayCommands.class
+                    ).setPermissionManager(AudioPlayerPermissionManager.INSTANCE)
+                    .addArgumentTypes(registry -> {
+                        registry.register(ServerFileArgument.class, new ServerFileArgument.ServerFileArgumentSupplier(), new ServerFileArgument.ServerFileArgumentTypeConverter());
+                    })
+                    .build();
+        });
 
-        FileNameManager.init();
-        Path configFolder = FabricLoader.getInstance().getConfigDir().resolve(MODID);
-        SERVER_CONFIG = ConfigBuilder.builder(ServerConfig::new).path(configFolder.resolve("audioplayer-server.properties")).build();
-        if (SERVER_CONFIG.runWebServer.get()) {
-            WEB_SERVER_CONFIG = ConfigBuilder.builder(WebServerConfig::new).path(configFolder.resolve("webserver.properties")).build();
-        } else {
-            WEB_SERVER_CONFIG = ConfigBuilder.builder(WebServerConfig::new).build();
-        }
-
-        try {
-            Files.createDirectories(AudioManager.getUploadFolder());
-        } catch (IOException e) {
-            LOGGER.warn("Failed to create upload folder", e);
-        }
-
-        AUDIO_CACHE = new AudioCache(SERVER_CONFIG.cacheSize.get());
-
-        ServerLifecycleEvents.SERVER_STARTED.register(WebServerEvents::onServerStarted);
-        ServerLifecycleEvents.SERVER_STOPPING.register(WebServerEvents::onServerStopped);
-
+        AudioPlayerModule.onInitialize();
     }
+
+    public static Path getModConfigFolder() {
+        return FabricLoader.getInstance().getConfigDir().resolve(MODID);
+    }
+
 }

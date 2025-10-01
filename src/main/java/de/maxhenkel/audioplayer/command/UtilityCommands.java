@@ -2,29 +2,25 @@ package de.maxhenkel.audioplayer.command;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import de.maxhenkel.admiral.annotations.Command;
-import de.maxhenkel.admiral.annotations.RequiresPermission;
-import de.maxhenkel.audioplayer.CustomSound;
-import de.maxhenkel.audioplayer.FileNameManager;
-import de.maxhenkel.audioplayer.PlayerType;
-import net.minecraft.ChatFormatting;
+import de.maxhenkel.admiral.annotations.*;
+import de.maxhenkel.audioplayer.audioloader.AudioData;
+import de.maxhenkel.audioplayer.audioloader.AudioStorageManager;
+import de.maxhenkel.audioplayer.audioloader.Metadata;
+import de.maxhenkel.audioplayer.audioplayback.PlayerType;
+import de.maxhenkel.audioplayer.lang.Lang;
+import de.maxhenkel.audioplayer.permission.AudioPlayerPermissionManager;
+import de.maxhenkel.audioplayer.utils.ChatUtils;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.*;
 
-import java.util.Optional;
+import java.util.*;
 
 @Command("audioplayer")
 public class UtilityCommands {
 
-    @RequiresPermission("audioplayer.apply")
+    @RequiresPermission(AudioPlayerPermissionManager.APPLY_PERMISSION_STRING)
     @Command("clear")
     public void clear(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
@@ -32,94 +28,77 @@ public class UtilityCommands {
 
         PlayerType playerType = PlayerType.fromItemStack(itemInHand);
         if (playerType == null) {
-            context.getSource().sendFailure(Component.literal("Invalid item"));
+            context.getSource().sendFailure(Lang.translatable("audioplayer.invalid_item"));
             return;
         }
 
-        if (!CustomSound.clearItem(itemInHand)) {
-            context.getSource().sendFailure(Component.literal("Item does not have custom audio"));
+        if (!AudioData.clearItem(context.getSource().getServer(), itemInHand)) {
+            context.getSource().sendFailure(Lang.translatable("audioplayer.item_no_audio"));
             return;
         }
 
-        if (itemInHand.has(DataComponents.INSTRUMENT)) {
-            Optional<Holder.Reference<Instrument>> holder = BuiltInRegistries.INSTRUMENT.getHolder(Instruments.PONDER_GOAT_HORN);
-            holder.ifPresent(instrumentReference -> itemInHand.set(DataComponents.INSTRUMENT, instrumentReference));
-        }
-        if (itemInHand.has(DataComponents.JUKEBOX_PLAYABLE)) {
-            JukeboxPlayable jukeboxPlayable = itemInHand.getItem().components().get(DataComponents.JUKEBOX_PLAYABLE);
-            if (jukeboxPlayable != null) {
-                itemInHand.set(DataComponents.JUKEBOX_PLAYABLE, jukeboxPlayable);
-            } else {
-                itemInHand.remove(DataComponents.JUKEBOX_PLAYABLE);
-            }
-        }
-
-        if (itemInHand.has(DataComponents.HIDE_ADDITIONAL_TOOLTIP)) {
-            itemInHand.remove(DataComponents.HIDE_ADDITIONAL_TOOLTIP);
-        }
-
-        if (itemInHand.has(DataComponents.LORE)) {
-            itemInHand.remove(DataComponents.LORE);
-        }
-
-        context.getSource().sendSuccess(() -> Component.literal("Successfully cleared item"), false);
+        context.getSource().sendSuccess(() -> Lang.translatable("audioplayer.item_clear_successful"), false);
     }
 
     @Command("id")
     public void id(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        CustomSound customSound = getHeldSound(context);
-        if (customSound == null) {
+        UUID id = getHeldItemId(context);
+        if (id == null) {
             return;
         }
-        context.getSource().sendSuccess(() -> UploadCommands.sendUUIDMessage(customSound.getSoundId(), Component.literal("Successfully extracted sound ID.")), false);
+        context.getSource().sendSuccess(() -> ChatUtils.createApplyMessage(id, Lang.translatable("audioplayer.extract_sound_id_successful")), false);
     }
 
-    @Command("name")
-    public void name(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        CustomSound customSound = getHeldSound(context);
-        if (customSound == null) {
+    @Command("info")
+    public void info(CommandContext<CommandSourceStack> context, @Name("id") UUID id) {
+        if (!AudioStorageManager.instance().checkSoundExists(id)) {
+            context.getSource().sendFailure(Lang.translatable("audioplayer.no_audio_file_id_found", id.toString()));
             return;
         }
-        Optional<FileNameManager> optionalMgr = FileNameManager.instance();
-
-        if (optionalMgr.isEmpty()) {
-            context.getSource().sendFailure(Component.literal("An internal error occurred"));
-            return;
-        }
-
-        FileNameManager mgr = optionalMgr.get();
-        String fileName = mgr.getFileName(customSound.getSoundId());
-        if (fileName == null) {
-            context.getSource().sendFailure(Component.literal("Custom audio does not have an associated file name"));
-            return;
-        }
-
-        context.getSource().sendSuccess(() -> Component.literal("Audio file name: ").append(Component.literal(fileName).withStyle(style -> {
-            return style
-                    .withColor(ChatFormatting.GREEN)
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Click to copy")))
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, fileName));
-        })), false);
+        context.getSource().sendSuccess(() -> ChatUtils.createInfoMessage(id), false);
     }
 
-    private static CustomSound getHeldSound(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    @Command("info")
+    public void info(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        UUID id = getHeldItemId(context);
+        if (id == null) {
+            return;
+        }
+        context.getSource().sendSuccess(() -> ChatUtils.createInfoMessage(id), false);
+    }
+
+    @Command("search")
+    public void search(CommandContext<CommandSourceStack> context, @Name("file_name") String name) throws CommandSyntaxException {
+        List<Metadata> metadata = AudioStorageManager.metadataManager().getByFileName(name, false);
+
+        if (metadata.isEmpty()) {
+            context.getSource().sendFailure(Lang.translatable("audioplayer.no_audio_files_name_found", name));
+            return;
+        }
+
+        context.getSource().sendSuccess(() -> Lang.translatable("audioplayer.search_results", metadata.size(), name), false);
+
+        for (Metadata meta : metadata) {
+            context.getSource().sendSuccess(() -> ChatUtils.createInfoMessage(meta.getAudioId()), false);
+        }
+    }
+
+    public static UUID getHeldItemId(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ItemStack itemInHand = player.getItemInHand(InteractionHand.MAIN_HAND);
 
-        PlayerType playerType = PlayerType.fromItemStack(itemInHand);
-
-        if (playerType == null) {
-            context.getSource().sendFailure(Component.literal("Invalid item"));
+        AudioData data = AudioData.of(itemInHand);
+        if (data == null) {
+            context.getSource().sendFailure(Lang.translatable("audioplayer.item_no_audio"));
+            return null;
+        }
+        UUID actualSoundId = data.getActualSoundId();
+        if (actualSoundId == null) {
+            context.getSource().sendFailure(Lang.translatable("audioplayer.item_no_audio_id"));
             return null;
         }
 
-        CustomSound customSound = CustomSound.of(itemInHand);
-        if (customSound == null) {
-            context.getSource().sendFailure(Component.literal("Item does not have custom audio"));
-            return null;
-        }
-
-        return customSound;
+        return actualSoundId;
     }
 
 }

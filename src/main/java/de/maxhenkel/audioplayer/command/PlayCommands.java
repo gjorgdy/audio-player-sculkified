@@ -6,11 +6,10 @@ import de.maxhenkel.admiral.annotations.Command;
 import de.maxhenkel.admiral.annotations.Min;
 import de.maxhenkel.admiral.annotations.Name;
 import de.maxhenkel.admiral.annotations.RequiresPermission;
-import de.maxhenkel.audioplayer.PlayerManager;
-import de.maxhenkel.audioplayer.Plugin;
-import de.maxhenkel.voicechat.api.VoicechatServerApi;
+import de.maxhenkel.audioplayer.audioplayback.PlayerManager;
+import de.maxhenkel.audioplayer.lang.Lang;
+import de.maxhenkel.audioplayer.permission.AudioPlayerPermissionManager;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -18,43 +17,34 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 
 @Command("audioplayer")
+@RequiresPermission(AudioPlayerPermissionManager.PLAY_COMMAND_PERMISSION_STRING)
 public class PlayCommands {
 
-    @RequiresPermission("audioplayer.play_command")
     @Command("play")
     public void play(CommandContext<CommandSourceStack> context, @Name("sound") UUID sound, @Name("location") Vec3 location, @Name("range") @Min("0") float range) throws CommandSyntaxException {
         @Nullable ServerPlayer player = context.getSource().getPlayer();
-        VoicechatServerApi api = Plugin.voicechatServerApi;
-        if (api == null) {
-            return;
-        }
         PlayerManager.instance().playLocational(
-                api,
                 context.getSource().getLevel(),
                 location,
                 sound,
                 player,
                 range,
                 null,
-                Integer.MAX_VALUE,
-                true
+                null
         );
-        context.getSource().sendSuccess(() -> Component.literal("Successfully played %s".formatted(sound)), false);
+        context.getSource().sendSuccess(() -> Lang.translatable("audioplayer.play_successful", sound), false);
     }
 
-    @RequiresPermission("audioplayer.play_command")
     @Command("stop")
-    private static int stop(CommandContext<CommandSourceStack> context, @Name("sound") UUID sound) {
-        UUID channelID = PlayerManager.instance().findChannelID(sound, true);
+    private static int stop(CommandContext<CommandSourceStack> context, @Name("audioId") UUID audioId) {
+        int count = PlayerManager.instance().stopAll(audioId);
 
-        if (channelID != null) {
-            PlayerManager.instance().stop(channelID);
-            context.getSource().sendSuccess(() -> Component.literal("Successfully stopped %s".formatted(sound)), false);
-            return 1;
+        if (count > 0) {
+            context.getSource().sendSuccess(() -> Lang.translatable("audioplayer.stop_streams_successful", count), false);
         } else {
-            context.getSource().sendFailure(Component.literal("Failed to stop, could not find sound with ID %s".formatted(sound)));
+            context.getSource().sendFailure(Lang.translatable("audioplayer.no_audio_file_id_found", audioId));
         }
-        return 0;
+        return count;
     }
 
 }
