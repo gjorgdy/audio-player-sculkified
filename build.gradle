@@ -70,6 +70,7 @@ artifacts {
 def webResourcesDir = layout.buildDirectory.dir("web-resources")
 
 processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(webResourcesDir)
     filesMatching('fabric.mod.json') {
         expand 'mod_version': mod_version,
