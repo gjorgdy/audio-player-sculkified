@@ -143,6 +143,7 @@ public class AudioStorageManager {
                 saveSound(id, fileName, bytes, player);
                 runOnMain(() -> {
                     if (player != null) {
+                        // TODO UI pop-up if player is holding disc
                         player.sendSystemMessage(ChatUtils.createApplyMessage(id, Lang.translatable("audioplayer.import_successful")));
                     }
                 });

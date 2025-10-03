@@ -58,12 +58,12 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
         if (data == null) {
             return false;
         }
-        boolean isRadio = SculkRadio.API.isRadio(level, blockPos);
+        boolean isRadio = SculkRadio.api().isRadio(level, blockPos);
         ChannelReference<?> channel = PlayerManager.instance().playType(level, null, data, PlayerType.MUSIC_DISC, AudioEvents.PLAY_MUSIC_DISC, AudioEvents.POST_PLAY_MUSIC_DISC, blockPos.getCenter(), isRadio);
         if (channel == null) return false;
-        if (SculkRadio.API.isRadio(level, blockPos)) {
+        if (SculkRadio.api().isRadio(level, blockPos)) {
             if (channel.getChannel() instanceof MultiLocationalAudioChannel mlChannel) {
-                SculkRadio.API.play(
+                SculkRadio.api().connect(
                         level,
                         this.blockPos,
                         n -> mlChannel.addChannel(n.getWorld(), n.getPos().getCenter()),
@@ -84,7 +84,7 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
             return false;
         }
         if (level instanceof ServerLevel sl)
-            SculkRadio.API.stop(sl, this.blockPos);
+            SculkRadio.api().disconnect(sl, this.blockPos);
         PlayerManager.instance().stop(channelId);
         channelId = null;
         song = null;
@@ -116,7 +116,7 @@ public abstract class JukeboxSongPlayerMixin implements CustomJukeboxSongPlayer 
 
         if (shouldEmitJukeboxPlayingEvent()) {
             if (levelAccessor instanceof ServerLevel sw) {
-                boolean executed = SculkRadio.API.tick(sw, this.blockPos);
+                boolean executed = SculkRadio.api().tick(sw, this.blockPos);
                 if (!executed) spawnMusicParticles(levelAccessor, blockPos);
             }
         }
